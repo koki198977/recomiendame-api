@@ -1,0 +1,1 @@
+// SeenItem entity
