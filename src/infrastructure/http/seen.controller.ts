@@ -13,7 +13,7 @@ export class SeenController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async markSeen(@Request() req, @Body() body: any) {
-    const userId = req.user.id;
+    const userId = req.user.sub;
     await this.markSeenUseCase.execute({
       userId,
       tmdbId: body.tmdbId,
@@ -26,7 +26,7 @@ export class SeenController {
   @UseGuards(JwtAuthGuard)
   @Get()
   async getSeenItems(@Request() req) {
-    const userId = req.user.id;
+    const userId = req.user.sub;
     const items = await this.getSeenItemsUseCase.execute(userId);
     return items;
   }

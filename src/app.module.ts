@@ -24,6 +24,12 @@ import { LoginUseCase } from './application/use-cases/login.use-case';
 import { AUTH_REPOSITORY } from './application/ports/auth.repository';
 import { AuthRepositoryImpl } from './infrastructure/repositories/auth.repository.impl';
 import { JwtModule } from '@nestjs/jwt';
+import { FAVORITE_REPOSITORY } from './application/ports/favorite.repository';
+import { FavoriteRepositoryImpl } from './infrastructure/repositories/favorite.repository.impl';
+import { FavoriteController } from './infrastructure/http/favorite.controller';
+import { AddFavoriteUseCase } from './application/use-cases/add-favorite.use-case';
+import { RemoveFavoriteUseCase } from './application/use-cases/remove-favorite.use-case';
+import { GetFavoritesUseCase } from './application/use-cases/get-favorites.use-case';
 
 
 
@@ -34,7 +40,7 @@ import { JwtModule } from '@nestjs/jwt';
     PrismaModule,
     JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
   ],
-  controllers: [AppController, SeenController, UserController],
+  controllers: [AppController, SeenController, UserController, FavoriteController],
   providers: [
     AppService,
     CreateUserUseCase,
@@ -52,7 +58,14 @@ import { JwtModule } from '@nestjs/jwt';
     {
       provide: SeenRepositoryToken,
       useClass: PgSeenRepository,
-    }
+    },
+    AddFavoriteUseCase,
+    RemoveFavoriteUseCase,
+    GetFavoritesUseCase,
+    {
+      provide: FAVORITE_REPOSITORY,
+      useClass: FavoriteRepositoryImpl,
+    },
   ]
 })
 export class AppModule {}
