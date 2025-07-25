@@ -31,6 +31,11 @@ import { AddFavoriteUseCase } from './application/use-cases/add-favorite.use-cas
 import { RemoveFavoriteUseCase } from './application/use-cases/remove-favorite.use-case';
 import { GetFavoritesUseCase } from './application/use-cases/get-favorites.use-case';
 import { TmdbModule } from './infrastructure/tmdb/tmdb.module';
+import { RatingController } from './infrastructure/http/rating.controller';
+import { RateItemUseCase } from './application/use-cases/rate-item.use-case';
+import { GetUserRatingsUseCase } from './application/use-cases/get-user-ratings.use-case';
+import { RATING_REPOSITORY } from './application/ports/rating.repository';
+import { RatingRepositoryImpl } from './infrastructure/repositories/rating.repository.impl';
 
 
 
@@ -42,7 +47,7 @@ import { TmdbModule } from './infrastructure/tmdb/tmdb.module';
     JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
     TmdbModule
   ],
-  controllers: [AppController, SeenController, UserController, FavoriteController],
+  controllers: [AppController, SeenController, UserController, FavoriteController, RatingController],
   providers: [
     AppService,
     CreateUserUseCase,
@@ -67,6 +72,12 @@ import { TmdbModule } from './infrastructure/tmdb/tmdb.module';
     {
       provide: FAVORITE_REPOSITORY,
       useClass: FavoriteRepositoryImpl,
+    },
+    RateItemUseCase,
+    GetUserRatingsUseCase,
+    {
+      provide: RATING_REPOSITORY,
+      useClass: RatingRepositoryImpl,
     },
   ]
 })
