@@ -5,5 +5,6 @@ export class SeenItem {
     public readonly title: string,
     public readonly mediaType: 'movie' | 'tv',
     public readonly watchedAt: Date = new Date(),
+    public readonly createdAt: Date = new Date(),
   ) {}
 }

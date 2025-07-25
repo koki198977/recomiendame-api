@@ -7,16 +7,28 @@ import { Rating } from 'src/domain/entities/rating';
 export class RatingRepositoryImpl implements RatingRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async rate(userId: string, tmdbId: number, rating: number, comment?: string): Promise<Rating> {
+  async rate(
+    userId: string,
+    tmdbId: number,
+    title: string,
+    rating: number,
+    comment?: string,
+  ): Promise<Rating> {
     const record = await this.prisma.rating.upsert({
-      where: {
-        userId_tmdbId: { userId, tmdbId },
-      },
-      update: { rating, comment },
-      create: { userId, tmdbId, rating, comment },
+      where: { userId_tmdbId: { userId, tmdbId } },
+      update: { rating, comment, title },
+      create: { userId, tmdbId, rating, comment, title },
     });
 
-    return new Rating(record.id, record.userId, record.tmdbId, record.rating, record.comment, record.createdAt);
+    return new Rating(
+      record.id,
+      record.userId,
+      record.tmdbId,
+      record.title,
+      record.rating,
+      record.comment,
+      record.createdAt,
+    );
   }
 
   async getRatingsByUser(userId: string): Promise<Rating[]> {
@@ -27,7 +39,15 @@ export class RatingRepositoryImpl implements RatingRepository {
 
     return records.map(
       (r) =>
-        new Rating(r.id, r.userId, r.tmdbId, r.rating, r.comment, r.createdAt),
+        new Rating(
+          r.id,
+          r.userId,
+          r.tmdbId,
+          r.title,
+          r.rating,
+          r.comment,
+          r.createdAt,
+        ),
     );
   }
 
@@ -38,6 +58,14 @@ export class RatingRepositoryImpl implements RatingRepository {
 
     if (!record) return null;
 
-    return new Rating(record.id, record.userId, record.tmdbId, record.rating, record.comment, record.createdAt);
+    return new Rating(
+      record.id,
+      record.userId,
+      record.tmdbId,
+      record.title,
+      record.rating,
+      record.comment,
+      record.createdAt,
+    );
   }
 }

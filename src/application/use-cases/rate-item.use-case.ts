@@ -8,7 +8,7 @@ export class RateItemUseCase {
     private readonly ratingRepo: RatingRepository,
   ) {}
 
-  async execute(userId: string, tmdbId: number, rating: number, comment?: string) {
-    return this.ratingRepo.rate(userId, tmdbId, rating, comment);
+  async execute(userId: string, tmdbId: number, title: string, rating: number, comment?: string) {
+    return this.ratingRepo.rate(userId, tmdbId, title, rating, comment);
   }
 }

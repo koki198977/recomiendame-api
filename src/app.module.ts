@@ -36,6 +36,11 @@ import { RateItemUseCase } from './application/use-cases/rate-item.use-case';
 import { GetUserRatingsUseCase } from './application/use-cases/get-user-ratings.use-case';
 import { RATING_REPOSITORY } from './application/ports/rating.repository';
 import { RatingRepositoryImpl } from './infrastructure/repositories/rating.repository.impl';
+import { OpenAiService } from './infrastructure/ai/openai.service';
+import { GenerateRecommendationsUseCase } from './application/use-cases/generate-recommendations.use-case';
+import { RecommendationController } from './infrastructure/http/recommendation.controller';
+import { USER_DATA_REPOSITORY } from './application/ports/user-data.repository';
+import { UserDataRepositoryImpl } from './infrastructure/repositories/user-data.repository.impl';
 
 
 
@@ -47,8 +52,14 @@ import { RatingRepositoryImpl } from './infrastructure/repositories/rating.repos
     JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
     TmdbModule
   ],
-  controllers: [AppController, SeenController, UserController, FavoriteController, RatingController],
+  controllers: [AppController, SeenController, UserController, FavoriteController, RatingController, RecommendationController],
   providers: [
+    OpenAiService,
+    GenerateRecommendationsUseCase,
+    {
+      provide: USER_DATA_REPOSITORY,
+      useClass: UserDataRepositoryImpl,
+    },
     AppService,
     CreateUserUseCase,
     VerifyEmailUseCase,

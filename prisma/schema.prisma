@@ -64,6 +64,7 @@ model Rating {
   id        String   @id @default(cuid())
   userId    String
   tmdbId    Int
+  title     String
   rating    Int // Por ejemplo de 1 a 5
   comment   String?
   createdAt DateTime @default(now())

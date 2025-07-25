@@ -14,11 +14,12 @@ export class RatingController {
   @Post()
   async rate(
     @Request() req,
-    @Body() body: { tmdbId: number; rating: number; comment?: string },
+    @Body() body: { tmdbId: number; title: string; rating: number; comment?: string },
   ) {
     const result = await this.rateItem.execute(
       req.user.sub,
       body.tmdbId,
+      body.title,
       body.rating,
       body.comment,
     );

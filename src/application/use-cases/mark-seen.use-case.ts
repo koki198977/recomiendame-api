@@ -19,7 +19,7 @@ export class MarkSeenUseCase {
       input.userId,
       input.tmdbId,
       input.title,
-      input.mediaType
+      input.mediaType,
     );
     await this.seenRepo.save(seenItem);
   }
