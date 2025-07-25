@@ -30,6 +30,7 @@ import { FavoriteController } from './infrastructure/http/favorite.controller';
 import { AddFavoriteUseCase } from './application/use-cases/add-favorite.use-case';
 import { RemoveFavoriteUseCase } from './application/use-cases/remove-favorite.use-case';
 import { GetFavoritesUseCase } from './application/use-cases/get-favorites.use-case';
+import { TmdbModule } from './infrastructure/tmdb/tmdb.module';
 
 
 
@@ -39,6 +40,7 @@ import { GetFavoritesUseCase } from './application/use-cases/get-favorites.use-c
     AuthModule,
     PrismaModule,
     JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
+    TmdbModule
   ],
   controllers: [AppController, SeenController, UserController, FavoriteController],
   providers: [
