@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards, Request, Get } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt.strategy';
 import { MarkSeenUseCase } from '../../application/use-cases/mark-seen.use-case';
 import { GetSeenItemsUseCase } from '../../application/use-cases/get-seen-items.use-case';
+import { MarkSeenDto } from '../dtos/mark-seen.dto';
 
 @Controller('seen')
 export class SeenController {
@@ -12,13 +13,11 @@ export class SeenController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async markSeen(@Request() req, @Body() body: any) {
+  async mark(@Request() req, @Body() dto: MarkSeenDto) {
     const userId = req.user.sub;
     await this.markSeenUseCase.execute({
       userId,
-      tmdbId: body.tmdbId,
-      title: body.title,
-      mediaType: body.mediaType,
+      ...dto,
     });
     return { message: 'Item marked as seen' };
   }

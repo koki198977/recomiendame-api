@@ -12,6 +12,7 @@ import { RemoveFavoriteUseCase } from 'src/application/use-cases/remove-favorite
 import { JwtAuthGuard } from '../auth/jwt.strategy';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { GetFavoritesUseCase } from 'src/application/use-cases/get-favorites.use-case';
+import { AddFavoriteDto } from '../dtos/add-favorite.dto';
 
 @Controller('favorites')
 @UseGuards(JwtAuthGuard)
@@ -25,9 +26,14 @@ export class FavoriteController {
   @Post()
   async addFavoriteHandler(
     @CurrentUser() user: { sub: string },
-    @Body() body: { tmdbId: number; title: string; mediaType: string },
+    @Body() body: AddFavoriteDto,
   ) {
-    await this.addFavorite.execute(user.sub, body.tmdbId, body.title, body.mediaType);
+    await this.addFavorite.execute(
+      user.sub,
+      body.tmdbId,
+      body.title,
+      body.mediaType,
+    );
     return { message: 'Agregado a favoritos' };
   }
 
