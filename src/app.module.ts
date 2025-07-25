@@ -52,7 +52,7 @@ import { JwtModule } from '@nestjs/jwt';
     {
       provide: SeenRepositoryToken,
       useClass: PgSeenRepository,
-    },
+    }
   ]
 })
 export class AppModule {}

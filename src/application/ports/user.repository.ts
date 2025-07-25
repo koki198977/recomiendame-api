@@ -9,4 +9,5 @@ export interface UserRepository {
   findAll(): Promise<User[]>;
   update(id: string, data: Partial<User>): Promise<User>;
   delete(id: string): Promise<void>;
+  updatePassword(userId: string, hashedPassword: string): Promise<void>;
 }

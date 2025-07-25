@@ -140,4 +140,12 @@ export class UserRepositoryImpl implements UserRepository {
       user.favoriteGenres ?? [],
     );
 
+
+    async updatePassword(userId: string, hashedPassword: string): Promise<void> {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { password: hashedPassword },
+        });
+    }
+
 }
