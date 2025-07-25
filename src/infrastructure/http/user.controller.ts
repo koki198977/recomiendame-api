@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { CreateUserUseCase } from '../../application/use-cases/create-user.use-case';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { VerifyEmailUseCase } from 'src/application/use-cases/verify-email.use-case';
@@ -7,6 +7,9 @@ import { ListUsersUseCase } from 'src/application/use-cases/list-users.use-case'
 import { UpdateUserUseCase } from 'src/application/use-cases/update-user.use-case';
 import { DeleteUserUseCase } from 'src/application/use-cases/delete-user.use-case';
 import { User } from 'src/domain/entities/user';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { UpdateUserDto } from '../dtos/update-user.dto';
+import { JwtAuthGuard } from '../auth/jwt.strategy';
 
 @Controller('users')
 export class UserController {
@@ -17,6 +20,7 @@ export class UserController {
     private readonly listUsersUseCase: ListUsersUseCase,
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly deleteUserUseCase: DeleteUserUseCase,
+    private readonly getUserById: GetUserByIdUseCase,
 ) {}
 
   @Post()
@@ -35,11 +39,6 @@ export class UserController {
     return this.listUsersUseCase.execute();
   }
 
-  @Get(':id')
-  async findById(@Param('id') id: string): Promise<User> {
-    return this.getUserByIdUseCase.execute(id);
-  }
-
   @Put(':id')
   async update(
     @Param('id') id: string,
@@ -52,5 +51,30 @@ export class UserController {
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     await this.deleteUserUseCase.execute(id);
     return { message: 'Usuario eliminado con éxito' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async getProfile(@CurrentUser() user: { sub: string }) {
+    return this.getUserById.execute(user.sub);
+  }
+
+  @Get(':id')
+  async findById(@Param('id') id: string): Promise<User> {
+    return this.getUserByIdUseCase.execute(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  async updateProfile(
+    @CurrentUser() user: { sub: string },
+    @Body() body: UpdateUserDto,
+  ) {
+    const data = {
+        ...body,
+        birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
+    };
+    const updated = await this.updateUserUseCase.execute(user.sub, data);
+    return updated;
   }
 }

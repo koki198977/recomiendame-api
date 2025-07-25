@@ -96,10 +96,10 @@ export class UserRepositoryImpl implements UserRepository {
     }
 
     async findById(id: string): Promise<User | null> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) return null;
-    return this.mapToEntity(user);
-  }
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) return null;
+        return this.mapToEntity(user);
+    }
 
   async findAll(): Promise<User[]> {
     const users = await this.prisma.user.findMany();
