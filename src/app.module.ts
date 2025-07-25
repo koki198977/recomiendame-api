@@ -20,6 +20,10 @@ import { GetUserByIdUseCase } from './application/use-cases/get-user-by-id.use-c
 import { ListUsersUseCase } from './application/use-cases/list-users.use-case';
 import { UpdateUserUseCase } from './application/use-cases/update-user.use-case';
 import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case';
+import { LoginUseCase } from './application/use-cases/login.use-case';
+import { AUTH_REPOSITORY } from './application/ports/auth.repository';
+import { AuthRepositoryImpl } from './infrastructure/repositories/auth.repository.impl';
+import { JwtModule } from '@nestjs/jwt';
 
 
 
@@ -28,6 +32,7 @@ import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case'
     ConfigModule.forRoot({ isGlobal: true }),
     AuthModule,
     PrismaModule,
+    JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
   ],
   controllers: [AppController, SeenController, UserController],
   providers: [
@@ -36,6 +41,8 @@ import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case'
     VerifyEmailUseCase,
     { provide: USER_REPOSITORY, useClass: UserRepositoryImpl },
     { provide: EMAIL_TOKEN_REPOSITORY, useClass: EmailVerificationTokenRepositoryImpl },
+    LoginUseCase,
+    { provide: AUTH_REPOSITORY, useClass: AuthRepositoryImpl },
     GetUserByIdUseCase,
     ListUsersUseCase,
     UpdateUserUseCase,
@@ -46,6 +53,6 @@ import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case'
       provide: SeenRepositoryToken,
       useClass: PgSeenRepository,
     },
-  ],
+  ]
 })
 export class AppModule {}

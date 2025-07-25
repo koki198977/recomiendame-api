@@ -1,6 +1,7 @@
 import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 
 @Controller('auth')
 export class AuthController {
@@ -15,8 +16,7 @@ export class AuthController {
       where: { email: body.email },
     });
 
-    if (!user || user.password !== body.password) {
-      // en real sería comparar hashes
+    if (!user || !(await bcrypt.compare(body.password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
