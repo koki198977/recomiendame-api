@@ -1,10 +1,51 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './infrastructure/auth/auth.module';
+import { SeenController } from './infrastructure/http/seen.controller';
+import { MarkSeenUseCase } from './application/use-cases/mark-seen.use-case';
+import { SeenRepositoryToken } from './application/ports/seen.repository';
+import { GetSeenItemsUseCase } from './application/use-cases/get-seen-items.use-case';
+import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { PgSeenRepository } from './infrastructure/repositories/seen.repository.impl';
+import { UserController } from './infrastructure/http/user.controller';
+import { CreateUserUseCase } from './application/use-cases/create-user.use-case';
+import { VerifyEmailUseCase } from './application/use-cases/verify-email.use-case';
+import { USER_REPOSITORY } from './application/ports/user.repository';
+import { UserRepositoryImpl } from './infrastructure/repositories/user.repository.impl';
+import { EMAIL_TOKEN_REPOSITORY } from './application/ports/email-token.repository';
+import { EmailVerificationTokenRepositoryImpl } from './infrastructure/repositories/email-token.repository.impl';
+import { GetUserByIdUseCase } from './application/use-cases/get-user-by-id.use-case';
+import { ListUsersUseCase } from './application/use-cases/list-users.use-case';
+import { UpdateUserUseCase } from './application/use-cases/update-user.use-case';
+import { DeleteUserUseCase } from './application/use-cases/delete-user.use-case';
+
+
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    AuthModule,
+    PrismaModule,
+  ],
+  controllers: [AppController, SeenController, UserController],
+  providers: [
+    AppService,
+    CreateUserUseCase,
+    VerifyEmailUseCase,
+    { provide: USER_REPOSITORY, useClass: UserRepositoryImpl },
+    { provide: EMAIL_TOKEN_REPOSITORY, useClass: EmailVerificationTokenRepositoryImpl },
+    GetUserByIdUseCase,
+    ListUsersUseCase,
+    UpdateUserUseCase,
+    DeleteUserUseCase,
+    MarkSeenUseCase,
+    GetSeenItemsUseCase,
+    {
+      provide: SeenRepositoryToken,
+      useClass: PgSeenRepository,
+    },
+  ],
 })
 export class AppModule {}

@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  password       String
+  fullName       String
+  birthDate      DateTime?
+  gender         String? // 'M', 'F', 'X', u otro
+  country        String? // ISO country code: CL, AR, etc.
+  language       String? // 'es', 'en', etc.
+  favoriteGenres String[] // Prisma permite arrays de strings (Postgres)
+  emailVerified  Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  seenItems              SeenItem[]
+  ratings                Rating[]
+  favorites              Favorite[]
+  recommendations        Recommendation[]
+  emailVerificationToken EmailVerificationToken?
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  token     String   @unique
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SeenItem {
+  id        String   @id @default(cuid())
+  userId    String
+  tmdbId    Int
+  title     String
+  mediaType String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tmdbId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  tmdbId    Int
+  rating    Int // Por ejemplo de 1 a 5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tmdbId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  tmdbId    Int
+  title     String
+  mediaType String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tmdbId])
+}
+
+model Recommendation {
+  id        String   @id @default(cuid())
+  userId    String
+  tmdbId    Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
