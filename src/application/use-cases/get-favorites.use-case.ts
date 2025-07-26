@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { FAVORITE_REPOSITORY, FavoriteRepository } from '../ports/favorite.repository';
 import { Favorite } from 'src/domain/entities/favorite';
+import { GetFavoritesQuery } from 'src/infrastructure/dtos/get-favorites.query';
 
 @Injectable()
 export class GetFavoritesUseCase {
@@ -9,7 +10,7 @@ export class GetFavoritesUseCase {
     private readonly favoriteRepository: FavoriteRepository,
   ) {}
 
-  async execute(userId: string): Promise<Favorite[]> {
-    return this.favoriteRepository.findAllByUser(userId);
+  async execute(userId: string, query?: GetFavoritesQuery): Promise<Favorite[]> {
+    return this.favoriteRepository.findAllByUser(userId, query);
   }
 }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FavoriteRepository } from 'src/application/ports/favorite.repository';
 import { Favorite } from 'src/domain/entities/favorite';
+import { GetFavoritesQuery } from '../dtos/get-favorites.query';
 
 @Injectable()
 export class FavoriteRepositoryImpl implements FavoriteRepository {
@@ -49,22 +50,21 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
     return this.findAllByUser(userId);
   }
 
-  async findAllByUser(userId: string): Promise<Favorite[]> {
-    const records = await this.prisma.favorite.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAllByUser(userId: string, query?: GetFavoritesQuery): Promise<Favorite[]> {
+    const where: any = { userId };
+    if (query?.mediaType) {
+      where.mediaType = query.mediaType;
+    }
 
-    return records.map(
-      (record) =>
-        new Favorite(
-          record.id,
-          record.userId,
-          record.tmdbId,
-          record.title,
-          record.mediaType,
-          record.createdAt,
-        ),
-    );
+    const orderBy: any = {};
+    if (query?.orderBy) {
+      orderBy[query.orderBy] = query.order ?? 'desc';
+    } else {
+      orderBy.createdAt = 'desc';
+    }
+
+    const records = await this.prisma.favorite.findMany({ where, orderBy });
+
+    return records.map((r) => new Favorite(r.id, r.userId, r.tmdbId, r.title, r.mediaType, r.createdAt));
   }
 }

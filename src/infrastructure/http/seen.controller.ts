@@ -1,8 +1,9 @@
-import { Controller, Post, Body, UseGuards, Request, Get } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.strategy';
 import { MarkSeenUseCase } from '../../application/use-cases/mark-seen.use-case';
 import { GetSeenItemsUseCase } from '../../application/use-cases/get-seen-items.use-case';
 import { MarkSeenDto } from '../dtos/mark-seen.dto';
+import { ListQueryDto } from '../dtos/list-query.dto';
 
 @Controller('seen')
 export class SeenController {
@@ -24,9 +25,12 @@ export class SeenController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  async getSeenItems(@Request() req) {
+  async getSeenItems(
+    @Request() req,
+    @Query() query: ListQueryDto,
+  ) {
     const userId = req.user.sub;
-    const items = await this.getSeenItemsUseCase.execute(userId);
+    const items = await this.getSeenItemsUseCase.execute(userId, query);
     return items;
   }
 }

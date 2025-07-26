@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SeenRepository } from '../../application/ports/seen.repository';
 import { SeenItem } from '../../domain/entities/seen-item';
+import { ListQueryDto } from '../dtos/list-query.dto';
 
 @Injectable()
 export class PgSeenRepository implements SeenRepository {
@@ -25,10 +26,30 @@ export class PgSeenRepository implements SeenRepository {
     });
   }
 
-  async findByUser(userId: string): Promise<SeenItem[]> {
-    const items = await this.prisma.seenItem.findMany({ where: { userId } });
-    return items.map((item) => new SeenItem(item.userId, item.tmdbId, item.title, item.mediaType as 'movie' | 'tv'));
+  async findByUser(userId: string, query?: ListQueryDto): Promise<SeenItem[]> {
+    const { mediaType, orderBy } = query || {};
+
+    const items = await this.prisma.seenItem.findMany({
+      where: {
+        userId,
+        ...(mediaType ? { mediaType } : {}),
+      },
+      orderBy: {
+        [orderBy === 'title' ? 'title' : 'tmdbId']: 'desc',
+      },
+    });
+
+    return items.map(
+      (item) =>
+        new SeenItem(
+          item.userId,
+          item.tmdbId,
+          item.title,
+          item.mediaType as 'movie' | 'tv',
+        ),
+    );
   }
+
 
   async hasSeen(userId: string, tmdbId: number): Promise<boolean> {
     const item = await this.prisma.seenItem.findUnique({

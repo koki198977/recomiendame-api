@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { RATING_REPOSITORY, RatingRepository } from '../ports/rating.repository';
+import { ListQueryDto } from 'src/infrastructure/dtos/list-query.dto';
+import { Rating } from 'src/domain/entities/rating';
 
 @Injectable()
 export class GetUserRatingsUseCase {
@@ -8,7 +10,7 @@ export class GetUserRatingsUseCase {
     private readonly ratingRepo: RatingRepository,
   ) {}
 
-  async execute(userId: string) {
-    return this.ratingRepo.getRatingsByUser(userId);
+  async execute(userId: string, query?: ListQueryDto): Promise<Rating[]> {
+    return this.ratingRepo.getRatingsByUser(userId, query);
   }
 }
