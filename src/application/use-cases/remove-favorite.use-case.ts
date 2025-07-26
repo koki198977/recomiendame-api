@@ -21,8 +21,8 @@ export class RemoveFavoriteUseCase {
     }
 
     // Obtener el favorito antes de eliminarlo, para poder registrar el título y mediaType
-    const favorite = await this.favoriteRepo.findAllByUser(userId);
-    const item = favorite.find((f) => f.tmdbId === tmdbId);
+    const result = await this.favoriteRepo.findAllByUser(userId);
+    const item = result.items.find((f) => f.tmdbId === tmdbId);
 
     await this.favoriteRepo.removeFavorite(userId, tmdbId);
 

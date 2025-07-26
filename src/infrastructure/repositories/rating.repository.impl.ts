@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RatingRepository } from 'src/application/ports/rating.repository';
 import { Rating } from 'src/domain/entities/rating';
 import { ListQueryDto } from '../dtos/list-query.dto';
+import { PaginatedResult } from 'src/application/dtos/paginated-result.dto';
 
 @Injectable()
 export class RatingRepositoryImpl implements RatingRepository {
@@ -34,20 +35,28 @@ export class RatingRepositoryImpl implements RatingRepository {
     );
   }
 
-  async getRatingsByUser(userId: string, query?: ListQueryDto): Promise<Rating[]> {
-    const { mediaType, orderBy } = query || {};
 
-    const records = await this.prisma.rating.findMany({
-      where: {
-        userId,
-        ...(mediaType ? { mediaType } : {}),
-      },
-      orderBy: {
-        [orderBy === 'title' ? 'title' : 'createdAt']: 'desc',
-      },
-    });
+  async getRatingsByUser(userId: string, query?: ListQueryDto): Promise<PaginatedResult<Rating>> {
+    const { mediaType, orderBy, skip = 0, take = 10 } = query || {};
 
-    return records.map(
+    const where = {
+      userId,
+      ...(mediaType ? { mediaType } : {}),
+    };
+
+    const [total, records] = await Promise.all([
+      this.prisma.rating.count({ where }),
+      this.prisma.rating.findMany({
+        where,
+        orderBy: {
+          [orderBy === 'title' ? 'title' : 'createdAt']: 'desc',
+        },
+        skip,
+        take,
+      }),
+    ]);
+
+    const items = records.map(
       (r) =>
         new Rating(
           r.id,
@@ -59,6 +68,19 @@ export class RatingRepositoryImpl implements RatingRepository {
           r.comment,
           r.createdAt,
         ),
+    );
+
+    const page = Math.floor(skip / take) + 1;
+    const totalPages = Math.ceil(total / take);
+    const hasNextPage = page < totalPages;
+
+    return new PaginatedResult<Rating>(
+      total,
+      items,
+      page,
+      take,
+      totalPages,
+      hasNextPage,
     );
   }
 

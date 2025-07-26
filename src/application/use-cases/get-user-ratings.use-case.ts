@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { RATING_REPOSITORY, RatingRepository } from '../ports/rating.repository';
 import { ListQueryDto } from 'src/infrastructure/dtos/list-query.dto';
 import { Rating } from 'src/domain/entities/rating';
+import { PaginatedResult } from '../dtos/paginated-result.dto';
 
 @Injectable()
 export class GetUserRatingsUseCase {
@@ -10,7 +11,7 @@ export class GetUserRatingsUseCase {
     private readonly ratingRepo: RatingRepository,
   ) {}
 
-  async execute(userId: string, query?: ListQueryDto): Promise<Rating[]> {
+  async execute(userId: string, query?: ListQueryDto): Promise<PaginatedResult<Rating>> {
     return this.ratingRepo.getRatingsByUser(userId, query);
   }
 }

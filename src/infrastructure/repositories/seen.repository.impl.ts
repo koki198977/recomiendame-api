@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SeenRepository } from '../../application/ports/seen.repository';
 import { SeenItem } from '../../domain/entities/seen-item';
 import { ListQueryDto } from '../dtos/list-query.dto';
+import { PaginatedResult } from 'src/application/dtos/paginated-result.dto';
 
 @Injectable()
 export class PgSeenRepository implements SeenRepository {
@@ -26,27 +27,48 @@ export class PgSeenRepository implements SeenRepository {
     });
   }
 
-  async findByUser(userId: string, query?: ListQueryDto): Promise<SeenItem[]> {
-    const { mediaType, orderBy } = query || {};
+  async findByUser(userId: string, query?: ListQueryDto): Promise<PaginatedResult<SeenItem>> {
+    const { mediaType, orderBy, skip = 0, take = 10 } = query || {};
 
-    const items = await this.prisma.seenItem.findMany({
-      where: {
-        userId,
-        ...(mediaType ? { mediaType } : {}),
-      },
-      orderBy: {
-        [orderBy === 'title' ? 'title' : 'tmdbId']: 'desc',
-      },
-    });
+    const where = {
+      userId,
+      ...(mediaType ? { mediaType } : {}),
+    };
 
-    return items.map(
+    const [total, items] = await Promise.all([
+      this.prisma.seenItem.count({ where }),
+      this.prisma.seenItem.findMany({
+        where,
+        orderBy: {
+          [orderBy === 'title' ? 'title' : 'tmdbId']: 'desc',
+        },
+        skip,
+        take,
+      }),
+    ]);
+
+    const mappedItems = items.map(
       (item) =>
         new SeenItem(
           item.userId,
           item.tmdbId,
           item.title,
           item.mediaType as 'movie' | 'tv',
+          item.createdAt,
         ),
+    );
+
+    const page = Math.floor(skip / take) + 1;
+    const totalPages = Math.ceil(total / take);
+    const hasNextPage = page < totalPages;
+
+    return new PaginatedResult<SeenItem>(
+      total,
+      mappedItems,
+      page,
+      take,
+      totalPages,
+      hasNextPage
     );
   }
 
@@ -58,8 +80,44 @@ export class PgSeenRepository implements SeenRepository {
     return !!item;
   }
 
-  async getSeenItems(userId: string): Promise<SeenItem[]> {
-    const items = await this.prisma.seenItem.findMany({ where: { userId } });
-    return items.map(i => new SeenItem(i.userId, i.tmdbId, i.title, i.mediaType as 'movie' | 'tv', i.createdAt));
+  async getSeenItems(userId: string, query?: ListQueryDto): Promise<PaginatedResult<SeenItem>> {
+    const { mediaType, orderBy, skip = 0, take = 10 } = query || {};
+
+    const where = {
+      userId,
+      ...(mediaType ? { mediaType } : {}),
+    };
+
+    const orderByClause = {
+      [orderBy === 'title' ? 'title' : 'tmdbId']: 'desc',
+    };
+
+    const [total, records] = await Promise.all([
+      this.prisma.seenItem.count({ where }),
+      this.prisma.seenItem.findMany({
+        where,
+        orderBy: orderByClause,
+        skip,
+        take,
+      }),
+    ]);
+
+    const items = records.map(
+      (i) =>
+        new SeenItem(
+          i.userId,
+          i.tmdbId,
+          i.title,
+          i.mediaType as 'movie' | 'tv',
+          i.createdAt,
+        ),
+    );
+
+    const page = Math.floor(skip / take) + 1;
+    const totalPages = Math.ceil(total / take);
+    const hasNextPage = page < totalPages;
+
+    return new PaginatedResult<SeenItem>(total, items, page, take, totalPages, hasNextPage);
   }
+
 }

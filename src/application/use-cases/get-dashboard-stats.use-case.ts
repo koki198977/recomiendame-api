@@ -20,7 +20,7 @@ export class GetDashboardStatsUseCase {
   ) {}
 
   async execute(userId: string) {
-    const [seen, favorites, ratings, user, recentRecommendations] = await Promise.all([
+    const [seenData, favoritesData, ratingsData, user, recentRecommendations] = await Promise.all([
       this.seenRepo.getSeenItems(userId),
       this.favoriteRepo.findAllByUser(userId),
       this.ratingRepo.getRatingsByUser(userId),
@@ -28,10 +28,14 @@ export class GetDashboardStatsUseCase {
       this.recommendationRepo.findLatestByUser(userId, 5),
     ]);
 
+    const seen = seenData.items;
+    const ratings = ratingsData.items;
+    const favorites = favoritesData.items;
+
     const stats = {
-      seenTotal: seen.length,
+      seenTotal: seenData.total,
       favoriteTotal: favorites.length,
-      ratingsTotal: ratings.length,
+      ratingsTotal: ratingsData.total,
       averageRating:
         ratings.length > 0
           ? parseFloat((ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(2))
@@ -59,4 +63,5 @@ export class GetDashboardStatsUseCase {
 
     return stats;
   }
+
 }

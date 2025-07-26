@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FavoriteRepository } from 'src/application/ports/favorite.repository';
 import { Favorite } from 'src/domain/entities/favorite';
 import { GetFavoritesQuery } from '../dtos/get-favorites.query';
+import { PaginatedResult } from 'src/application/dtos/paginated-result.dto';
 
 @Injectable()
 export class FavoriteRepositoryImpl implements FavoriteRepository {
@@ -46,25 +47,49 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
     return !!record;
   }
 
-  async getFavorites(userId: string): Promise<Favorite[]> {
+  async getFavorites(userId: string): Promise<PaginatedResult<Favorite>> {
     return this.findAllByUser(userId);
   }
 
-  async findAllByUser(userId: string, query?: GetFavoritesQuery): Promise<Favorite[]> {
+
+  async findAllByUser(userId: string, query?: GetFavoritesQuery): Promise<PaginatedResult<Favorite>> {
+    const { mediaType, orderBy, order = 'desc', skip = 0, take = 10 } = query || {};
+
     const where: any = { userId };
-    if (query?.mediaType) {
-      where.mediaType = query.mediaType;
+    if (mediaType) {
+      where.mediaType = mediaType;
     }
 
-    const orderBy: any = {};
-    if (query?.orderBy) {
-      orderBy[query.orderBy] = query.order ?? 'desc';
-    } else {
-      orderBy.createdAt = 'desc';
-    }
+    const orderByClause = {
+      [orderBy || 'createdAt']: order,
+    };
 
-    const records = await this.prisma.favorite.findMany({ where, orderBy });
+    const [total, records] = await Promise.all([
+      this.prisma.favorite.count({ where }),
+      this.prisma.favorite.findMany({
+        where,
+        orderBy: orderByClause,
+        skip,
+        take,
+      }),
+    ]);
 
-    return records.map((r) => new Favorite(r.id, r.userId, r.tmdbId, r.title, r.mediaType, r.createdAt));
+    const items = records.map(
+      (r) => new Favorite(r.id, r.userId, r.tmdbId, r.title, r.mediaType, r.createdAt),
+    );
+
+    const page = Math.floor(skip / take) + 1;
+    const totalPages = Math.ceil(total / take);
+    const hasNextPage = page < totalPages;
+
+    return new PaginatedResult<Favorite>(
+      total,
+      items,
+      page,
+      take,
+      totalPages,
+      hasNextPage,
+    );
   }
+
 }

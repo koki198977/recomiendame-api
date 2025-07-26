@@ -1,4 +1,5 @@
-import { IsOptional, IsIn } from 'class-validator';
+import { IsOptional, IsIn, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class GetFavoritesQuery {
   @IsOptional()
@@ -12,4 +13,16 @@ export class GetFavoritesQuery {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   order?: 'asc' | 'desc';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  take?: number;
 }
