@@ -18,6 +18,7 @@ export class RatingController {
       req.user.sub,
       dto.tmdbId,
       dto.title!,
+      dto.mediaType,
       dto.rating,
       dto.comment,
     );

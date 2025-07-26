@@ -21,6 +21,6 @@ export class UserDataRepositoryImpl implements UserDataRepository {
 
   async getRatings(userId: string): Promise<Rating[]> {
     const items = await this.prisma.rating.findMany({ where: { userId } });
-    return items.map(i => new Rating(i.id, i.userId, i.tmdbId, i.title, i.rating, i.comment, i.createdAt));
+    return items.map(i => new Rating(i.id, i.userId, i.tmdbId, i.title, i.mediaType as 'movie' | 'tv', i.rating, i.comment, i.createdAt));
   }
 }

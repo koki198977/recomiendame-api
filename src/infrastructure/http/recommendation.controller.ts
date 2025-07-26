@@ -9,7 +9,7 @@ export class RecommendationController {
 
   @Get()
   async getRecommendations(@Request() req) {
-    const userId = req.user.id;
+    const userId = req.user.sub;
     const recommendations = await this.generateRecommendations.execute(userId);
     return { recommendations };
   }

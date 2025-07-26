@@ -8,5 +8,6 @@ import { ConfigModule } from '@nestjs/config';
   imports: [HttpModule, ConfigModule],
   controllers: [TmdbController],
   providers: [TmdbService],
+  exports: [TmdbService],
 })
 export class TmdbModule {}

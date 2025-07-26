@@ -36,4 +36,9 @@ export class PgSeenRepository implements SeenRepository {
     });
     return !!item;
   }
+
+  async getSeenItems(userId: string): Promise<SeenItem[]> {
+    const items = await this.prisma.seenItem.findMany({ where: { userId } });
+    return items.map(i => new SeenItem(i.userId, i.tmdbId, i.title, i.mediaType as 'movie' | 'tv', i.createdAt));
+  }
 }

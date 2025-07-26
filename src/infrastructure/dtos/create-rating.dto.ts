@@ -13,6 +13,9 @@ export class CreateRatingDto {
   @IsString()
   title?: string;
 
+  @IsIn(['movie', 'tv'])
+  mediaType: 'movie' | 'tv';
+
   @IsOptional()
   @IsString()
   comment?: string;

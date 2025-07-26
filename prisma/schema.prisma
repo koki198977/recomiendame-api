@@ -26,6 +26,7 @@ model User {
   recommendations        Recommendation[]
   emailVerificationToken EmailVerificationToken?
   passwordResetTokens    PasswordResetToken[]
+  ActivityLog            ActivityLog[]
 }
 
 model EmailVerificationToken {
@@ -65,6 +66,7 @@ model Rating {
   userId    String
   tmdbId    Int
   title     String
+  mediaType String
   rating    Int // Por ejemplo de 1 a 5
   comment   String?
   createdAt DateTime @default(now())
@@ -91,7 +93,21 @@ model Recommendation {
   id        String   @id @default(cuid())
   userId    String
   tmdbId    Int
+  title     String
   reason    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String   // Ej: 'SEEN', 'FAVORITE_ADDED', 'FAVORITE_REMOVED', 'RATED'
+  tmdbId    Int
+  title     String
+  mediaType String?
+  details   String?  // Comentario, puntuación, etc.
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])

@@ -41,6 +41,14 @@ import { GenerateRecommendationsUseCase } from './application/use-cases/generate
 import { RecommendationController } from './infrastructure/http/recommendation.controller';
 import { USER_DATA_REPOSITORY } from './application/ports/user-data.repository';
 import { UserDataRepositoryImpl } from './infrastructure/repositories/user-data.repository.impl';
+import { ActivityLogController } from './infrastructure/http/activity-log.controller';
+import { GetActivityLogUseCase } from './application/use-cases/get-activity-log.use-case';
+import { ACTIVITY_LOG_REPOSITORY } from './application/ports/activity-log.repository';
+import { ActivityLogRepositoryImpl } from './infrastructure/repositories/activity-log.repository.impl';
+import { DashboardController } from './infrastructure/http/dashboard.controller';
+import { GetDashboardStatsUseCase } from './application/use-cases/get-dashboard-stats.use-case';
+import { RECOMMENDATION_REPOSITORY } from './application/ports/recommendation.repository';
+import { RecommendationRepositoryImpl } from './infrastructure/repositories/recommendation.repository.impl';
 
 
 
@@ -52,7 +60,7 @@ import { UserDataRepositoryImpl } from './infrastructure/repositories/user-data.
     JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
     TmdbModule
   ],
-  controllers: [AppController, SeenController, UserController, FavoriteController, RatingController, RecommendationController],
+  controllers: [AppController, SeenController, UserController, FavoriteController, RatingController, RecommendationController, ActivityLogController, DashboardController],
   providers: [
     OpenAiService,
     GenerateRecommendationsUseCase,
@@ -89,6 +97,16 @@ import { UserDataRepositoryImpl } from './infrastructure/repositories/user-data.
     {
       provide: RATING_REPOSITORY,
       useClass: RatingRepositoryImpl,
+    },
+    GetActivityLogUseCase,
+    {
+      provide: ACTIVITY_LOG_REPOSITORY,
+      useClass: ActivityLogRepositoryImpl,
+    },
+    GetDashboardStatsUseCase,
+    {
+      provide: RECOMMENDATION_REPOSITORY,
+      useClass: RecommendationRepositoryImpl,
     },
   ]
 })

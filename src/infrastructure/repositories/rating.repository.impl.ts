@@ -11,13 +11,14 @@ export class RatingRepositoryImpl implements RatingRepository {
     userId: string,
     tmdbId: number,
     title: string,
+    mediaType: 'movie' | 'tv',
     rating: number,
     comment?: string,
   ): Promise<Rating> {
     const record = await this.prisma.rating.upsert({
       where: { userId_tmdbId: { userId, tmdbId } },
-      update: { rating, comment, title },
-      create: { userId, tmdbId, rating, comment, title },
+      update: { rating, comment, title, mediaType },
+      create: { userId, tmdbId, title, mediaType, rating, comment },
     });
 
     return new Rating(
@@ -25,6 +26,7 @@ export class RatingRepositoryImpl implements RatingRepository {
       record.userId,
       record.tmdbId,
       record.title,
+      record.mediaType as 'movie' | 'tv',
       record.rating,
       record.comment,
       record.createdAt,
@@ -44,6 +46,7 @@ export class RatingRepositoryImpl implements RatingRepository {
           r.userId,
           r.tmdbId,
           r.title,
+          r.mediaType as 'movie' | 'tv',
           r.rating,
           r.comment,
           r.createdAt,
@@ -63,6 +66,7 @@ export class RatingRepositoryImpl implements RatingRepository {
       record.userId,
       record.tmdbId,
       record.title,
+      record.mediaType as 'movie' | 'tv',
       record.rating,
       record.comment,
       record.createdAt,

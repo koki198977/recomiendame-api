@@ -5,4 +5,5 @@ export interface SeenRepository {
   save(item: SeenItem): Promise<void>;
   findByUser(userId: string): Promise<SeenItem[]>;
   hasSeen(userId: string, tmdbId: number): Promise<boolean>;
+  getSeenItems(userId: string): Promise<SeenItem[]>;
 }
