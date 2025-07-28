@@ -82,12 +82,14 @@ model Favorite {
   tmdbId    Int
   title     String
   mediaType String
+  posterUrl String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, tmdbId])
 }
+
 
 model Recommendation {
   id          String   @id @default(cuid())

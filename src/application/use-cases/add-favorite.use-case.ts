@@ -3,6 +3,7 @@ import { Favorite } from '../../domain/entities/favorite';
 import { FavoriteRepository, FAVORITE_REPOSITORY } from '../ports/favorite.repository';
 import { ACTIVITY_LOG_REPOSITORY, ActivityLogRepository } from '../ports/activity-log.repository';
 import { ActivityLog } from 'src/domain/entities/activity-log';
+import { TmdbService } from 'src/infrastructure/tmdb/tmdb.service';
 
 @Injectable()
 export class AddFavoriteUseCase {
@@ -12,6 +13,7 @@ export class AddFavoriteUseCase {
 
     @Inject(ACTIVITY_LOG_REPOSITORY)
     private readonly activityRepo: ActivityLogRepository,
+    private readonly tmdbService: TmdbService, 
   ) {}
 
   async execute(
@@ -24,8 +26,8 @@ export class AddFavoriteUseCase {
     if (isAlreadyFavorite) {
       throw new Error('Este contenido ya está marcado como favorito');
     }
-
-    const favorite = await this.favoriteRepo.addFavorite(userId, tmdbId, title, mediaType);
+    const posterUrl = await this.tmdbService.getPoster(tmdbId, mediaType as 'movie' | 'tv');
+    const favorite = await this.favoriteRepo.addFavorite(userId, tmdbId, title, mediaType, posterUrl ?? undefined);
 
     await this.activityRepo.log(
       new ActivityLog(

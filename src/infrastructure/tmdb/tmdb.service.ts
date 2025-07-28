@@ -43,4 +43,25 @@ export class TmdbService {
 
   }
 
+  async getPoster(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<string | null> {
+    try {
+      const url = `${this.baseUrl}/${mediaType}/${tmdbId}`;
+      const { data } = await this.http.axiosRef.get(url, {
+        params: {
+          api_key: this.apiKey,
+          language: 'es-ES',
+        },
+        httpsAgent: this.httpsAgent,
+      });
+
+      return data.poster_path
+        ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+        : null;
+    } catch (error) {
+      console.error(`❌ Error al obtener póster TMDB para ${mediaType} ${tmdbId}:`, error.message);
+      return null;
+    }
+  }
+
+
 }

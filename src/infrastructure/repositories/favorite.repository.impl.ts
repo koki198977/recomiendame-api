@@ -9,13 +9,14 @@ import { PaginatedResult } from 'src/application/dtos/paginated-result.dto';
 export class FavoriteRepositoryImpl implements FavoriteRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async addFavorite(userId: string, tmdbId: number, title: string, mediaType: string): Promise<Favorite> {
+  async addFavorite(userId: string, tmdbId: number, title: string, mediaType: string, posterUrl?: string): Promise<Favorite> {
     const record = await this.prisma.favorite.create({
       data: {
         userId,
         tmdbId,
         title,
         mediaType,
+        posterUrl,
       },
     });
 
@@ -26,6 +27,7 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
       record.title,
       record.mediaType,
       record.createdAt,
+      record.posterUrl,
     );
   }
 
@@ -75,7 +77,7 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
     ]);
 
     const items = records.map(
-      (r) => new Favorite(r.id, r.userId, r.tmdbId, r.title, r.mediaType, r.createdAt),
+      (r) => new Favorite(r.id, r.userId, r.tmdbId, r.title, r.mediaType, r.createdAt, r.posterUrl),
     );
 
     const page = Math.floor(skip / take) + 1;

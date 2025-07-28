@@ -21,7 +21,7 @@ export class GenerateRecommendationsUseCase {
     private readonly activityLogRepo: ActivityLogRepository,
   ) {}
 
-  async execute(userId: string): Promise<string[]> {
+  async execute(userId: string): Promise<Recommendation[]> {
     const [seen, favorites, ratings, previous] = await Promise.all([
       this.userDataRepo.getSeenItems(userId),
       this.userDataRepo.getFavorites(userId),
@@ -46,6 +46,8 @@ export class GenerateRecommendationsUseCase {
     const rawResponse = await this.openAi.generate(prompt);
     const parsed = this.parseRecommendations(rawResponse);
 
+    const savedRecommendations: Recommendation[] = [];
+
     await Promise.all(
       parsed.map(async (title) => {
         const searchResult = await this.tmdb.search(title);
@@ -53,29 +55,32 @@ export class GenerateRecommendationsUseCase {
 
         const tmdbId = firstMatch?.id ?? 0;
         const reason = `Recomendado por similitud con tus gustos`;
-        try{
-          const genreIds = Array.isArray(firstMatch.genreIds) ? firstMatch.genreIds : [];
 
-          // Persistir recomendación
-          await this.recommendationRepo.save(
-            new Recommendation(
-              cuid(),
-              userId,
-              tmdbId,
-              firstMatch.title,
-              reason,
-              new Date(),
-              firstMatch.posterUrl,
-              firstMatch.overview,
-              firstMatch.releaseDate ? new Date(firstMatch.releaseDate) : null,
-              firstMatch.genreIds || [],
-              firstMatch.popularity,
-              firstMatch.voteAverage,
-              firstMatch.mediaType,
-            )
+        try {
+          const genreIds = Array.isArray(firstMatch.genreIds) ? firstMatch.genreIds : [];
+          const popularity = typeof firstMatch.popularity === 'number' ? firstMatch.popularity : 0;
+          const voteAverage = typeof firstMatch.voteAverage === 'number' ? firstMatch.voteAverage : 0;
+          const mediaType = firstMatch.mediaType ?? 'movie';
+
+          const recommendation = new Recommendation(
+            cuid(),
+            userId,
+            tmdbId,
+            firstMatch.title,
+            reason,
+            new Date(),
+            firstMatch.posterUrl,
+            firstMatch.overview,
+            firstMatch.releaseDate ? new Date(firstMatch.releaseDate) : null,
+            genreIds,
+            popularity,
+            voteAverage,
+            mediaType,
           );
 
-          // Registrar en actividad
+          await this.recommendationRepo.save(recommendation);
+          savedRecommendations.push(recommendation);
+
           await this.activityLogRepo.log(
             new ActivityLog(
               undefined,
@@ -91,14 +96,14 @@ export class GenerateRecommendationsUseCase {
         } catch (error) {
           if (this.isUniqueConstraintError(error)) {
             console.log(`🔁 Ya se había recomendado: ${title} (tmdbId: ${tmdbId})`);
-          } else {
-            throw error;
-          }
-        }
-      })
-    );
+              } else {
+                throw error;
+              }
+            }
+          })
+        );
 
-    return parsed;
+    return savedRecommendations;
   }
 
   private parseRecommendations(rawResponse: string): string[] {

@@ -6,5 +6,6 @@ export class Favorite {
     public readonly title: string,
     public readonly mediaType: string,
     public readonly createdAt: Date,
+    public readonly posterUrl?: string,
   ) {}
 }
