@@ -6,5 +6,6 @@ export class SeenItem {
     public readonly mediaType: 'movie' | 'tv',
     public readonly watchedAt: Date = new Date(),
     public readonly createdAt: Date = new Date(),
+    public readonly posterUrl?: string,
   ) {}
 }

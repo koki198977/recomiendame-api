@@ -17,12 +17,15 @@ export class PgSeenRepository implements SeenRepository {
           tmdbId: item.tmdbId,
         },
       },
-      update: {},
+      update: {
+        posterUrl: item.posterUrl ?? undefined,
+      },
       create: {
         userId: item.userId,
         tmdbId: item.tmdbId,
         title: item.title,
         mediaType: item.mediaType,
+        posterUrl: item.posterUrl ?? undefined,
       },
     });
   }
@@ -55,6 +58,8 @@ export class PgSeenRepository implements SeenRepository {
           item.title,
           item.mediaType as 'movie' | 'tv',
           item.createdAt,
+          item.createdAt,
+          item.posterUrl ?? undefined
         ),
     );
 

@@ -54,6 +54,7 @@ model SeenItem {
   tmdbId    Int
   title     String
   mediaType String
+  posterUrl String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
@@ -69,6 +70,7 @@ model Rating {
   mediaType String
   rating    Int // Por ejemplo de 1 a 5
   comment   String?
+  posterUrl String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
