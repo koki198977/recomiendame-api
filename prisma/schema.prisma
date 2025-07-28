@@ -68,7 +68,7 @@ model Rating {
   tmdbId    Int
   title     String
   mediaType String
-  rating    Int // Por ejemplo de 1 a 5
+  rating    Float // Por ejemplo de 1.5 a 5.0
   comment   String?
   posterUrl String?
   createdAt DateTime @default(now())

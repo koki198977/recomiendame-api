@@ -57,6 +57,7 @@ export class GetDashboardStatsUseCase {
         title: r.title,
         tmdbId: r.tmdbId,
         reason: r.reason,
+        posterUrl: r.posterUrl,
         createdAt: r.createdAt,
       })),
     };

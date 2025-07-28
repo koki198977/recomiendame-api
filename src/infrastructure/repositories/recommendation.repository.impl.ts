@@ -46,7 +46,7 @@ export class RecommendationRepositoryImpl implements RecommendationRepository {
     });
 
     return records.map(
-        (r) => new Recommendation(r.id, r.userId, r.tmdbId, r.title, r.reason, r.createdAt),
+        (r) => new Recommendation(r.id, r.userId, r.tmdbId, r.title, r.reason, r.createdAt, r.posterUrl ?? undefined),
     );
   }
 }

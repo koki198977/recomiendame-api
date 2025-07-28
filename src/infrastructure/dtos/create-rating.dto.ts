@@ -1,11 +1,11 @@
-import { IsInt, IsOptional, IsString, IsIn, Min, Max } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsIn, Min, Max, IsNumber } from 'class-validator';
 
 export class CreateRatingDto {
   @IsInt()
   tmdbId: number;
 
-  @IsInt()
-  @Min(1)
+  @IsNumber({ maxDecimalPlaces: 1 }) 
+  @Min(0.5)
   @Max(5)
   rating: number;
 
