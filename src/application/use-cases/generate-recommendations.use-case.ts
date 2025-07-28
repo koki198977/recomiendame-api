@@ -22,19 +22,26 @@ export class GenerateRecommendationsUseCase {
   ) {}
 
   async execute(userId: string): Promise<string[]> {
-    const [seen, favorites, ratings] = await Promise.all([
+    const [seen, favorites, ratings, previous] = await Promise.all([
       this.userDataRepo.getSeenItems(userId),
       this.userDataRepo.getFavorites(userId),
       this.userDataRepo.getRatings(userId),
+      this.recommendationRepo.findLatestByUser(userId, 10),
     ]);
 
-    const prompt = `Soy un recomendador de películas y series. Basado en lo siguiente:
+    const previouslyRecommendedTitles = previous.map((r) => r.title.toLowerCase());
+    const prompt = `Eres un recomendador de películas y series. 
+      Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente. 
+      NO repitas títulos.
 
-    🎬 Vistos: ${seen.map((s) => s.title).join(', ')}
-    ⭐ Favoritos: ${favorites.map((f) => f.title).join(', ')}
-    📝 Puntuaciones: ${ratings.map((r) => `${r.title} (${r.rating}/5)`).join(', ')}
+      Basado en los siguientes gustos del usuario:
 
-    Recomienda 5 películas o series que podrían gustarle. Solo nombres, separados por coma o numerados.`;
+      🎬 Vistos: ${seen.map((s) => s.title).join(', ')}
+      ⭐ Favoritos: ${favorites.map((f) => f.title).join(', ')}
+      📝 Puntuaciones: ${ratings.map((r) => `${r.title} (${r.rating}/5)`).join(', ')}
+      ❌ Ya recomendadas: ${previouslyRecommendedTitles.join(', ')}
+
+      Devuelve solo los nombres de las películas o series, separados por coma o numerados.`;
 
     const rawResponse = await this.openAi.generate(prompt);
     const parsed = this.parseRecommendations(rawResponse);
@@ -46,25 +53,48 @@ export class GenerateRecommendationsUseCase {
 
         const tmdbId = firstMatch?.id ?? 0;
         const reason = `Recomendado por similitud con tus gustos`;
+        try{
+          const genreIds = Array.isArray(firstMatch.genreIds) ? firstMatch.genreIds : [];
 
-        // Persistir recomendación
-        await this.recommendationRepo.save(
-          new Recommendation(cuid(), userId, tmdbId, title, reason, new Date())
-        );
+          // Persistir recomendación
+          await this.recommendationRepo.save(
+            new Recommendation(
+              cuid(),
+              userId,
+              tmdbId,
+              firstMatch.title,
+              reason,
+              new Date(),
+              firstMatch.posterUrl,
+              firstMatch.overview,
+              firstMatch.releaseDate ? new Date(firstMatch.releaseDate) : null,
+              firstMatch.genreIds || [],
+              firstMatch.popularity,
+              firstMatch.voteAverage,
+              firstMatch.mediaType,
+            )
+          );
 
-        // Registrar en actividad
-        await this.activityLogRepo.log(
-          new ActivityLog(
-            undefined,
-            userId,
-            'recommended',
-            tmdbId,
-            title,
-            undefined,
-            reason,
-            new Date(),
-          )
-        );
+          // Registrar en actividad
+          await this.activityLogRepo.log(
+            new ActivityLog(
+              undefined,
+              userId,
+              'recommended',
+              tmdbId,
+              title,
+              undefined,
+              reason,
+              new Date(),
+            )
+          );
+        } catch (error) {
+          if (this.isUniqueConstraintError(error)) {
+            console.log(`🔁 Ya se había recomendado: ${title} (tmdbId: ${tmdbId})`);
+          } else {
+            throw error;
+          }
+        }
       })
     );
 
@@ -77,4 +107,9 @@ export class GenerateRecommendationsUseCase {
     if (!matches) return [];
     return matches.map(line => line.replace(/^\d+\.\s*/, '').trim());
   }
+
+  isUniqueConstraintError(error: any): boolean {
+    return error?.code === 'P2002'; // código de Prisma para "Unique constraint failed"
+  }
+
 }

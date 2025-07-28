@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
+import https from 'https';
 
 @Injectable()
 export class TmdbService {
   private readonly apiKey: string;
   private readonly baseUrl = 'https://api.themoviedb.org/3';
+  private readonly httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
   constructor(
     private readonly http: HttpService,
@@ -24,17 +26,21 @@ export class TmdbService {
             language: 'es-ES',
             },
         });
-
+       
         return data.results.map((item) => ({
-            id: item.id,
-            title: item.title || item.name,
-            posterUrl: item.poster_path
+          id: item.id,
+          title: item.title || item.name,
+          posterUrl: item.poster_path
             ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
             : null,
-            mediaType: type,
-            overview: item.overview,
-            releaseDate: item.release_date || item.first_air_date,
+          mediaType: type, // 'movie' o 'tv'
+          overview: item.overview,
+          releaseDate: item.release_date || item.first_air_date,
+          genreIds: item.genre_ids ?? [], // debe ser array de int
+          popularity: item.popularity ?? 0,
+          voteAverage: item.vote_average ?? 0,
         }));
+
   }
 
 }

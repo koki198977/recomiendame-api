@@ -90,15 +90,25 @@ model Favorite {
 }
 
 model Recommendation {
-  id        String   @id @default(cuid())
-  userId    String
-  tmdbId    Int
-  title     String
-  reason    String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  tmdbId      Int
+  title       String
+  reason      String
+  posterUrl   String?   
+  overview    String?   
+  releaseDate DateTime? 
+  genreIds    Int[]     
+  popularity  Float?    
+  voteAverage Float?    
+  mediaType   String?   // : 'movie' | 'tv'
+  createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tmdbId])
 }
+
 
 model ActivityLog {
   id        String   @id @default(cuid())

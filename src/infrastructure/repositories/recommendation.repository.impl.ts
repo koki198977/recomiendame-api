@@ -10,13 +10,24 @@ export class RecommendationRepositoryImpl implements RecommendationRepository {
   async save(recommendation: Recommendation): Promise<void> {
     await this.prisma.recommendation.create({
       data: {
+        id: recommendation.id,
         userId: recommendation.userId,
         tmdbId: recommendation.tmdbId,
         title: recommendation.title,
         reason: recommendation.reason,
+        createdAt: recommendation.createdAt,
+        posterUrl: recommendation.posterUrl,
+        overview: recommendation.overview,
+        releaseDate: recommendation.releaseDate,
+        genreIds: recommendation.genreIds,
+        popularity: recommendation.popularity,
+        voteAverage: recommendation.voteAverage,
+        mediaType: recommendation.mediaType,
       },
     });
   }
+
+  
 
   async findAllByUser(userId: string): Promise<Recommendation[]> {
     const recs = await this.prisma.recommendation.findMany({
