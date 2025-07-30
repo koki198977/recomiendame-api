@@ -8,4 +8,5 @@ export interface SeenRepository {
   findByUser(userId: string, query?: ListQueryDto): Promise<PaginatedResult<SeenItem>>;
   hasSeen(userId: string, tmdbId: number): Promise<boolean>;
   getSeenItems(userId: string): Promise<PaginatedResult<SeenItem>>;
+  removeSeen(userId: string, tmdbId: number): Promise<void>;
 }

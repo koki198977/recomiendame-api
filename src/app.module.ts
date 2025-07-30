@@ -52,6 +52,8 @@ import { RecommendationRepositoryImpl } from './infrastructure/repositories/reco
 import { TMDB_REPOSITORY } from './application/ports/tmdb.repository';
 import { TmdbRepositoryImpl } from './infrastructure/repositories/tmdb.repository.impl';
 import { GetRecommendationsUseCase } from './application/use-cases/get-recommendations.use-case';
+import { RemoveSeenUseCase } from './application/use-cases/remove-seen.use-case';
+import { RemoveRatingUseCase } from './application/use-cases/remove-rating.use-case';
 
 
 
@@ -85,6 +87,7 @@ import { GetRecommendationsUseCase } from './application/use-cases/get-recommend
     DeleteUserUseCase,
     MarkSeenUseCase,
     GetSeenItemsUseCase,
+    RemoveSeenUseCase,
     {
       provide: SeenRepositoryToken,
       useClass: PgSeenRepository,
@@ -98,6 +101,7 @@ import { GetRecommendationsUseCase } from './application/use-cases/get-recommend
     },
     RateItemUseCase,
     GetUserRatingsUseCase,
+    RemoveRatingUseCase,
     {
       provide: RATING_REPOSITORY,
       useClass: RatingRepositoryImpl,

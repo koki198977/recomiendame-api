@@ -97,4 +97,12 @@ export class RatingRepositoryImpl implements RatingRepository {
       record.createdAt,
     );
   }
+
+  async removeRating(userId: string, tmdbId: number): Promise<void> {
+    await this.prisma.rating.delete({
+      where: {
+        userId_tmdbId: { userId, tmdbId },
+      },
+    });
+  }
 }

@@ -147,4 +147,12 @@ export class PgSeenRepository implements SeenRepository {
     return new PaginatedResult<SeenItem>(total, items, page, take, totalPages, hasNextPage);
   }
 
+  async removeSeen(userId: string, tmdbId: number): Promise<void> {
+    await this.prisma.seenItem.delete({
+      where: {
+        userId_tmdbId: { userId, tmdbId },
+      },
+    });
+  }
+
 }
