@@ -4,6 +4,7 @@ import { SeenRepository } from '../../application/ports/seen.repository';
 import { SeenItem } from '../../domain/entities/seen-item';
 import { ListQueryDto } from '../dtos/list-query.dto';
 import { PaginatedResult } from 'src/application/dtos/paginated-result.dto';
+import { Tmdb } from 'src/domain/entities/tmdb';
 
 @Injectable()
 export class PgSeenRepository implements SeenRepository {
@@ -18,64 +19,85 @@ export class PgSeenRepository implements SeenRepository {
         },
       },
       update: {
-        posterUrl: item.posterUrl ?? undefined,
+        createdAt: item.createdAt,
       },
       create: {
         userId: item.userId,
         tmdbId: item.tmdbId,
-        title: item.title,
-        mediaType: item.mediaType,
-        posterUrl: item.posterUrl ?? undefined,
+        createdAt: item.createdAt      
       },
     });
   }
 
   async findByUser(userId: string, query?: ListQueryDto): Promise<PaginatedResult<SeenItem>> {
-    const { mediaType, orderBy, skip = 0, take = 10 } = query || {};
+    const {
+      orderBy = 'createdAt',
+      order = 'desc',
+      skip = 0,
+      take = 10,
+      search,
+      mediaType,
+      platform,
+    } = query || {};
 
-    const where = {
+    const where: any = {
       userId,
-      ...(mediaType ? { mediaType } : {}),
+      ...(search || mediaType || platform
+        ? {
+            tmdb: {
+              ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
+              ...(mediaType ? { mediaType } : {}),
+              ...(platform ? { platforms: { has: platform } } : {}),
+            },
+          }
+        : {}),
     };
 
-    const [total, items] = await Promise.all([
+    const orderByClause = {
+      [orderBy]: order,
+    };
+
+    const [total, records] = await Promise.all([
       this.prisma.seenItem.count({ where }),
       this.prisma.seenItem.findMany({
         where,
-        orderBy: {
-          [orderBy === 'title' ? 'title' : 'tmdbId']: 'desc',
-        },
+        orderBy: orderByClause,
         skip,
         take,
+        include: {
+          tmdb: true,
+        },
       }),
     ]);
 
-    const mappedItems = items.map(
-      (item) =>
-        new SeenItem(
-          item.userId,
-          item.tmdbId,
-          item.title,
-          item.mediaType as 'movie' | 'tv',
-          item.createdAt,
-          item.createdAt,
-          item.posterUrl ?? undefined
-        ),
-    );
+    const items = records.map((i) => {
+      const tmdb = i.tmdb
+        ? new Tmdb(
+            i.tmdb.id,
+            i.tmdb.title,
+            i.tmdb.createdAt,
+            i.tmdb.posterUrl ?? undefined,
+            i.tmdb.overview ?? undefined,
+            i.tmdb.releaseDate ?? undefined,
+            i.tmdb.genreIds ?? [],
+            i.tmdb.popularity ?? 0,
+            i.tmdb.voteAverage ?? 0,
+            i.tmdb.mediaType as 'movie' | 'tv',
+            i.tmdb.platforms ?? [],
+            i.tmdb.trailerUrl ?? undefined,
+          )
+        : undefined;
+
+      return new SeenItem(i.userId, i.tmdbId, i.createdAt, i.createdAt, tmdb);
+    });
 
     const page = Math.floor(skip / take) + 1;
     const totalPages = Math.ceil(total / take);
     const hasNextPage = page < totalPages;
 
-    return new PaginatedResult<SeenItem>(
-      total,
-      mappedItems,
-      page,
-      take,
-      totalPages,
-      hasNextPage
-    );
+    return new PaginatedResult<SeenItem>(total, items, page, take, totalPages, hasNextPage);
   }
+
 
 
   async hasSeen(userId: string, tmdbId: number): Promise<boolean> {
@@ -86,11 +108,10 @@ export class PgSeenRepository implements SeenRepository {
   }
 
   async getSeenItems(userId: string, query?: ListQueryDto): Promise<PaginatedResult<SeenItem>> {
-    const { mediaType, orderBy, skip = 0, take = 10 } = query || {};
+    const { orderBy, skip = 0, take = 10 } = query || {};
 
     const where = {
       userId,
-      ...(mediaType ? { mediaType } : {}),
     };
 
     const orderByClause = {
@@ -104,6 +125,9 @@ export class PgSeenRepository implements SeenRepository {
         orderBy: orderByClause,
         skip,
         take,
+        include: {
+          tmdb: true,
+        },
       }),
     ]);
 
@@ -112,8 +136,6 @@ export class PgSeenRepository implements SeenRepository {
         new SeenItem(
           i.userId,
           i.tmdbId,
-          i.title,
-          i.mediaType as 'movie' | 'tv',
           i.createdAt,
         ),
     );

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecommendationRepository } from 'src/application/ports/recommendation.repository';
 import { Recommendation } from 'src/domain/entities/recommendation';
+import { Tmdb } from 'src/domain/entities/tmdb';
 
 @Injectable()
 export class RecommendationRepositoryImpl implements RecommendationRepository {
@@ -13,16 +14,8 @@ export class RecommendationRepositoryImpl implements RecommendationRepository {
         id: recommendation.id,
         userId: recommendation.userId,
         tmdbId: recommendation.tmdbId,
-        title: recommendation.title,
         reason: recommendation.reason,
-        createdAt: recommendation.createdAt,
-        posterUrl: recommendation.posterUrl,
-        overview: recommendation.overview,
-        releaseDate: recommendation.releaseDate,
-        genreIds: recommendation.genreIds,
-        popularity: recommendation.popularity,
-        voteAverage: recommendation.voteAverage,
-        mediaType: recommendation.mediaType,
+        createdAt: recommendation.createdAt
       },
     });
   }
@@ -32,21 +25,51 @@ export class RecommendationRepositoryImpl implements RecommendationRepository {
   async findAllByUser(userId: string): Promise<Recommendation[]> {
     const recs = await this.prisma.recommendation.findMany({
       where: { userId },
+      include: { tmdb: true },
       orderBy: { createdAt: 'desc' },
     });
 
-    return recs.map((r) => new Recommendation(r.id, r.userId, r.tmdbId, r.title, r.reason, r.createdAt));
+    return recs.map((r) => new Recommendation(r.id, r.userId, r.tmdbId, r.reason, r.createdAt));
   }
 
-  async findLatestByUser(userId: string, limit: number = 1): Promise<Recommendation[]> {
-    const records = await this.prisma.recommendation.findMany({
+  async findLatestByUser(userId: string, take = 5): Promise<Recommendation[]> {
+    const results = await this.prisma.recommendation.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take,
+      include: {
+        tmdb: true,
+      },
     });
 
-    return records.map(
-        (r) => new Recommendation(r.id, r.userId, r.tmdbId, r.title, r.reason, r.createdAt, r.posterUrl ?? undefined),
-    );
+    return results.map((r) => {
+      const tmdb = r.tmdb
+        ? new Tmdb(
+            r.tmdb.id,
+            r.tmdb.title,
+            r.tmdb.createdAt,
+            r.tmdb.posterUrl ?? undefined,
+            r.tmdb.overview ?? undefined,
+            r.tmdb.releaseDate ?? undefined,
+            r.tmdb.genreIds,
+            r.tmdb.popularity ?? 0,
+            r.tmdb.voteAverage ?? 0,
+            r.tmdb.mediaType as 'movie' | 'tv',
+            r.tmdb.platforms ?? [],
+            r.tmdb.trailerUrl ?? undefined,
+          )
+        : undefined;
+
+      return new Recommendation(
+        r.id,
+        r.userId,
+        r.tmdbId,
+        r.reason,
+        r.createdAt,
+        tmdb,
+      );
+    });
+
   }
+
 }

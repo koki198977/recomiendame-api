@@ -1,11 +1,7 @@
-import { IsOptional, IsIn, IsInt, Min } from 'class-validator';
+import { IsOptional, IsIn, IsInt, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class GetFavoritesQuery {
-  @IsOptional()
-  @IsIn(['movie', 'tv'])
-  mediaType?: 'movie' | 'tv';
-
   @IsOptional()
   @IsIn(['createdAt', 'title'])
   orderBy?: 'createdAt' | 'title';
@@ -25,4 +21,16 @@ export class GetFavoritesQuery {
   @IsInt()
   @Min(1)
   take?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsIn(['movie', 'tv'])
+  mediaType?: 'movie' | 'tv';
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
 }

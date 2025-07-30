@@ -12,23 +12,19 @@ export class RatingRepositoryImpl implements RatingRepository {
   async rate(
     userId: string,
     tmdbId: number,
-    title: string,
-    mediaType: 'movie' | 'tv',
     rating: number,
     comment?: string,
   ): Promise<Rating> {
     const record = await this.prisma.rating.upsert({
       where: { userId_tmdbId: { userId, tmdbId } },
-      update: { rating, comment, title, mediaType },
-      create: { userId, tmdbId, title, mediaType, rating, comment },
+      update: { rating, comment },
+      create: { userId, tmdbId, rating, comment },
     });
 
     return new Rating(
       record.id,
       record.userId,
       record.tmdbId,
-      record.title,
-      record.mediaType as 'movie' | 'tv',
       record.rating,
       record.comment,
       record.createdAt,
@@ -37,11 +33,10 @@ export class RatingRepositoryImpl implements RatingRepository {
 
 
   async getRatingsByUser(userId: string, query?: ListQueryDto): Promise<PaginatedResult<Rating>> {
-    const { mediaType, orderBy, skip = 0, take = 10 } = query || {};
+    const { orderBy, skip = 0, take = 10 } = query || {};
 
     const where = {
       userId,
-      ...(mediaType ? { mediaType } : {}),
     };
 
     const [total, records] = await Promise.all([
@@ -53,6 +48,9 @@ export class RatingRepositoryImpl implements RatingRepository {
         },
         skip,
         take,
+        include: {
+          tmdb: true,
+        },
       }),
     ]);
 
@@ -62,8 +60,6 @@ export class RatingRepositoryImpl implements RatingRepository {
           r.id,
           r.userId,
           r.tmdbId,
-          r.title,
-          r.mediaType as 'movie' | 'tv',
           r.rating,
           r.comment,
           r.createdAt,
@@ -96,8 +92,6 @@ export class RatingRepositoryImpl implements RatingRepository {
       record.id,
       record.userId,
       record.tmdbId,
-      record.title,
-      record.mediaType as 'movie' | 'tv',
       record.rating,
       record.comment,
       record.createdAt,

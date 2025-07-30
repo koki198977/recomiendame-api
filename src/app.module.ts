@@ -49,6 +49,9 @@ import { DashboardController } from './infrastructure/http/dashboard.controller'
 import { GetDashboardStatsUseCase } from './application/use-cases/get-dashboard-stats.use-case';
 import { RECOMMENDATION_REPOSITORY } from './application/ports/recommendation.repository';
 import { RecommendationRepositoryImpl } from './infrastructure/repositories/recommendation.repository.impl';
+import { TMDB_REPOSITORY } from './application/ports/tmdb.repository';
+import { TmdbRepositoryImpl } from './infrastructure/repositories/tmdb.repository.impl';
+import { GetRecommendationsUseCase } from './application/use-cases/get-recommendations.use-case';
 
 
 
@@ -64,6 +67,7 @@ import { RecommendationRepositoryImpl } from './infrastructure/repositories/reco
   providers: [
     OpenAiService,
     GenerateRecommendationsUseCase,
+    GetRecommendationsUseCase,
     {
       provide: USER_DATA_REPOSITORY,
       useClass: UserDataRepositoryImpl,
@@ -108,6 +112,10 @@ import { RecommendationRepositoryImpl } from './infrastructure/repositories/reco
       provide: RECOMMENDATION_REPOSITORY,
       useClass: RecommendationRepositoryImpl,
     },
+    {
+      provide: TMDB_REPOSITORY,
+      useClass: TmdbRepositoryImpl,
+    }
   ]
 })
 export class AppModule {}

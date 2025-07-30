@@ -42,23 +42,25 @@ export class GetDashboardStatsUseCase {
           : null,
       breakdownByType: {
         movie: {
-          seen: seen.filter((i) => i.mediaType === 'movie').length,
-          favorites: favorites.filter((i) => i.mediaType === 'movie').length,
-          ratings: ratings.filter((i) => i.mediaType === 'movie').length,
+          seen: seen.filter((i) => i.tmdb?.mediaType === 'movie').length,
+          favorites: favorites.filter((i) => i.tmdb?.mediaType === 'movie').length,
+          ratings: ratings.filter((i) => i.tmdb?.mediaType === 'movie').length,
         },
         tv: {
-          seen: seen.filter((i) => i.mediaType === 'tv').length,
-          favorites: favorites.filter((i) => i.mediaType === 'tv').length,
-          ratings: ratings.filter((i) => i.mediaType === 'tv').length,
+          seen: seen.filter((i) => i.tmdb?.mediaType === 'tv').length,
+          favorites: favorites.filter((i) => i.tmdb?.mediaType === 'tv').length,
+          ratings: ratings.filter((i) => i.tmdb?.mediaType === 'tv').length,
         },
       },
       favoriteGenres: user.favoriteGenres || [],
       recentRecommendations: recentRecommendations.map((r) => ({
-        title: r.title,
+        title: r.tmdb?.title,
         tmdbId: r.tmdbId,
         reason: r.reason,
-        posterUrl: r.posterUrl,
+        posterUrl: r.tmdb?.posterUrl,
         createdAt: r.createdAt,
+        trailerUrl: r.tmdb?.trailerUrl ?? null,
+        platforms: r.tmdb?.platforms ?? [],
       })),
     };
 

@@ -1,14 +1,19 @@
-import { IsIn, IsOptional, IsInt, Min } from 'class-validator';
+import { IsIn, IsOptional, IsInt, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListQueryDto {
+
+  @IsOptional()
+  @IsIn(['createdAt', 'title'])
+  orderBy?: 'createdAt' | 'title';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  order?: 'asc' | 'desc';
+
   @IsOptional()
   @IsIn(['movie', 'tv'])
   mediaType?: 'movie' | 'tv';
-
-  @IsOptional()
-  @IsIn(['date', 'title'])
-  orderBy?: 'date' | 'title';
 
   @IsOptional()
   @Type(() => Number)
@@ -21,4 +26,12 @@ export class ListQueryDto {
   @IsInt()
   @Min(1)
   take?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
 }

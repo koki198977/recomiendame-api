@@ -18,8 +18,6 @@ export class RatingController {
     const result = await this.rateItem.execute(
       req.user.sub,
       dto.tmdbId,
-      dto.title!,
-      dto.mediaType,
       dto.rating,
       dto.comment,
     );

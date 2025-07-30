@@ -8,5 +8,5 @@ export class AddFavoriteDto {
   title: string;
 
   @IsIn(['movie', 'tv'])
-  mediaType: string;
+  mediaType: 'movie' | 'tv';
 }

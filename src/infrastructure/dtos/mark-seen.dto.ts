@@ -4,9 +4,6 @@ export class MarkSeenDto {
   @IsInt()
   tmdbId: number;
 
-  @IsString()
-  title: string;
-
   @IsIn(['movie', 'tv'])
   mediaType: 'movie' | 'tv';
 }

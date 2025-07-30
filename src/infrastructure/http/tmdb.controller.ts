@@ -6,8 +6,8 @@ export class TmdbController {
   constructor(private readonly tmdbService: TmdbService) {}
 
   @Get()
-  async search(@Query('q') query: string, @Query('type') type: 'movie' | 'tv' = 'movie') {
-    const results = await this.tmdbService.search(query, type);
+  async search(@Query('q') query: string) {
+    const results = await this.tmdbService.search(query);
     return { results };
   }
 }

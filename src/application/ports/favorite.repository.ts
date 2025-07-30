@@ -5,7 +5,7 @@ import { PaginatedResult } from '../dtos/paginated-result.dto';
 export const FAVORITE_REPOSITORY = Symbol('FAVORITE_REPOSITORY');
 
 export interface FavoriteRepository {
-  addFavorite(userId: string, tmdbId: number, title: string, mediaType: string, posterUrl?: string): Promise<Favorite>;
+  addFavorite(userId: string, tmdbId: number): Promise<Favorite>;
   removeFavorite(userId: string, tmdbId: number): Promise<void>;
   isFavorite(userId: string, tmdbId: number): Promise<boolean>;
   getFavorites(userId: string): Promise<PaginatedResult<Favorite>>;

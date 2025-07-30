@@ -34,8 +34,6 @@ export class RemoveFavoriteUseCase {
           userId,
           'removed_favorite',
           tmdbId,
-          item.title,
-          item.mediaType,
           undefined,
           new Date()
         )

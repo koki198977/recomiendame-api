@@ -4,19 +4,17 @@ import { FavoriteRepository } from 'src/application/ports/favorite.repository';
 import { Favorite } from 'src/domain/entities/favorite';
 import { GetFavoritesQuery } from '../dtos/get-favorites.query';
 import { PaginatedResult } from 'src/application/dtos/paginated-result.dto';
+import { Tmdb } from 'src/domain/entities/tmdb';
 
 @Injectable()
 export class FavoriteRepositoryImpl implements FavoriteRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async addFavorite(userId: string, tmdbId: number, title: string, mediaType: string, posterUrl?: string): Promise<Favorite> {
+  async addFavorite(userId: string, tmdbId: number): Promise<Favorite> {
     const record = await this.prisma.favorite.create({
       data: {
         userId,
-        tmdbId,
-        title,
-        mediaType,
-        posterUrl,
+        tmdbId
       },
     });
 
@@ -24,10 +22,7 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
       record.id,
       record.userId,
       record.tmdbId,
-      record.title,
-      record.mediaType,
       record.createdAt,
-      record.posterUrl,
     );
   }
 
@@ -55,16 +50,30 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
 
 
   async findAllByUser(userId: string, query?: GetFavoritesQuery): Promise<PaginatedResult<Favorite>> {
-    const { mediaType, orderBy, order = 'desc', skip = 0, take = 10 } = query || {};
+    const {
+      orderBy,
+      order = 'desc',
+      skip = 0,
+      take = 10,
+      search,
+      mediaType,
+      platform,
+    } = query || {};
 
-    const where: any = { userId };
-    if (mediaType) {
-      where.mediaType = mediaType;
-    }
-
-    const orderByClause = {
-      [orderBy || 'createdAt']: order,
+    const where: any = {
+      userId,
+      ...(search || mediaType || platform
+        ? {
+            tmdb: {
+              ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
+              ...(mediaType ? { mediaType } : {}),
+              ...(platform ? { platforms: { has: platform } } : {}),
+            },
+          }
+        : {}),
     };
+
+    const orderByClause = { [orderBy || 'createdAt']: order };
 
     const [total, records] = await Promise.all([
       this.prisma.favorite.count({ where }),
@@ -73,12 +82,30 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
         orderBy: orderByClause,
         skip,
         take,
+        include: { tmdb: true },
       }),
     ]);
 
-    const items = records.map(
-      (r) => new Favorite(r.id, r.userId, r.tmdbId, r.title, r.mediaType, r.createdAt, r.posterUrl),
-    );
+    const items = records.map((r) => {
+      const tmdb = r.tmdb
+        ? new Tmdb(
+            r.tmdb.id,
+            r.tmdb.title,
+            r.tmdb.createdAt,
+            r.tmdb.posterUrl ?? undefined,
+            r.tmdb.overview ?? undefined,
+            r.tmdb.releaseDate ?? undefined,
+            r.tmdb.genreIds ?? [],
+            r.tmdb.popularity ?? 0,
+            r.tmdb.voteAverage ?? 0,
+            r.tmdb.mediaType as 'movie' | 'tv',
+            r.tmdb.platforms ?? [],
+            r.tmdb.trailerUrl ?? undefined,
+          )
+        : undefined;
+
+      return new Favorite(r.id, r.userId, r.tmdbId, r.createdAt, tmdb);
+    });
 
     const page = Math.floor(skip / take) + 1;
     const totalPages = Math.ceil(total / take);
@@ -93,5 +120,7 @@ export class FavoriteRepositoryImpl implements FavoriteRepository {
       hasNextPage,
     );
   }
+
+
 
 }

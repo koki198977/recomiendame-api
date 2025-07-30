@@ -8,6 +8,8 @@ import { Recommendation } from 'src/domain/entities/recommendation';
 import { ActivityLog } from 'src/domain/entities/activity-log';
 import { TmdbService } from 'src/infrastructure/tmdb/tmdb.service';
 import cuid from 'cuid';
+import { TMDB_REPOSITORY, TmdbRepository } from '../ports/tmdb.repository';
+import { Tmdb } from 'src/domain/entities/tmdb';
 
 @Injectable()
 export class GenerateRecommendationsUseCase {
@@ -22,6 +24,8 @@ export class GenerateRecommendationsUseCase {
     private readonly recommendationRepo: RecommendationRepository,
     @Inject(ACTIVITY_LOG_REPOSITORY)
     private readonly activityLogRepo: ActivityLogRepository,
+    @Inject(TMDB_REPOSITORY)
+    private readonly tmdbRepository: TmdbRepository,
   ) {}
 
   async execute(userId: string): Promise<Recommendation[]> {
@@ -33,16 +37,16 @@ export class GenerateRecommendationsUseCase {
       this.userRepo.findById(userId),
     ]);
 
-    const previouslyRecommendedTitles = previous.map((r) => r.title.toLowerCase());
+    const previouslyRecommendedTitles = previous.map((r) => r.tmdb?.title.toLowerCase());
     const favoriteGenres = user?.favoriteGenres || [];
 
     const prompt = `Eres un recomendador de películas y series.
         Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.
         NO repitas títulos y prioriza los siguientes géneros favoritos del usuario: ${favoriteGenres.join(', ') || 'ninguno'}.
 
-        🎬 Vistos: ${seen.map((s) => s.title).join(', ') || 'ninguno'}
-        ⭐ Favoritos: ${favorites.map((f) => f.title).join(', ') || 'ninguno'}
-        📝 Puntuaciones: ${ratings.map((r) => `${r.title} (${r.rating}/5)`).join(', ') || 'ninguna'}
+        🎬 Vistos: ${seen.map((s) => s.tmdb?.title).join(', ') || 'ninguno'}
+        ⭐ Favoritos: ${favorites.map((f) => f.tmdb?.title).join(', ') || 'ninguno'}
+        📝 Puntuaciones: ${ratings.map((r) => `${r.tmdb?.title} (${r.rating}/5)`).join(', ') || 'ninguna'}
         ❌ Ya recomendadas: ${previouslyRecommendedTitles.join(', ') || 'ninguna'}
 
         Devuelve solo los nombres de las películas o series, separados por coma o numerados.`;
@@ -58,7 +62,12 @@ export class GenerateRecommendationsUseCase {
         const searchResult = await this.tmdb.search(title);
         const firstMatch = searchResult[0];
 
-        const tmdbId = firstMatch?.id ?? 0;
+        if (!firstMatch) {
+          console.warn(`🔍 No se encontró resultado para: "${title}"`);
+          return;
+        }
+
+        const tmdbId = firstMatch.id;
         const reason = `Recomendado por similitud con tus gustos`;
 
         try {
@@ -67,20 +76,29 @@ export class GenerateRecommendationsUseCase {
           const voteAverage = typeof firstMatch.voteAverage === 'number' ? firstMatch.voteAverage : 0;
           const mediaType = firstMatch.mediaType ?? 'movie';
 
+          await this.tmdbRepository.save(
+            new Tmdb(
+              tmdbId,
+              firstMatch.title,
+              new Date(),
+              firstMatch.posterUrl ?? undefined,
+              firstMatch.overview ?? undefined,
+              firstMatch.releaseDate ? new Date(firstMatch.releaseDate) : undefined,
+              genreIds,
+              popularity,
+              voteAverage,
+              mediaType,
+              firstMatch.platforms ?? [],
+              firstMatch.trailerUrl ?? undefined,
+            )
+          );
+
           const recommendation = new Recommendation(
             cuid(),
             userId,
             tmdbId,
-            firstMatch.title,
             reason,
             new Date(),
-            firstMatch.posterUrl,
-            firstMatch.overview,
-            firstMatch.releaseDate ? new Date(firstMatch.releaseDate) : null,
-            genreIds,
-            popularity,
-            voteAverage,
-            mediaType,
           );
 
           await this.recommendationRepo.save(recommendation);
@@ -92,8 +110,6 @@ export class GenerateRecommendationsUseCase {
               userId,
               'recommended',
               tmdbId,
-              title,
-              undefined,
               reason,
               new Date(),
             )
@@ -105,8 +121,9 @@ export class GenerateRecommendationsUseCase {
             throw error;
           }
         }
-      }),
+      })
     );
+
 
     return savedRecommendations;
   }
@@ -115,15 +132,23 @@ export class GenerateRecommendationsUseCase {
     const fullText = Array.isArray(rawResponse) ? rawResponse.join('\n') : rawResponse;
 
     const matches = fullText.match(/\d+\.\s+[^\n]+/g);
+    let titles: string[] = [];
+
     if (matches) {
-      return matches.map((line) => line.replace(/^\d+\.\s*/, '').trim());
+      titles = matches.map((line) => line.replace(/^\d+\.\s*/, '').trim());
+    } else {
+      titles = fullText
+        .split(',')
+        .map((title) => title.trim())
+        .filter((title) => title.length > 0);
     }
 
-    return fullText
-      .split(',')
-      .map((title) => title.trim())
-      .filter((title) => title.length > 0);
+    return titles.map((t) => {
+      const match = t.match(/"(.+?)"/);
+      return match ? match[1] : t;
+    });
   }
+
 
   isUniqueConstraintError(error: any): boolean {
     return error?.code === 'P2002';

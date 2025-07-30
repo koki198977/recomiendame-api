@@ -19,20 +19,13 @@ export class RateItemUseCase {
   async execute(
     userId: string,
     tmdbId: number,
-    title: string,
-    mediaType: 'movie' | 'tv',
     rating: number,
     comment?: string,
   ) {
 
-    if (mediaType !== 'movie' && mediaType !== 'tv') {
-        throw new Error('mediaType debe ser "movie" o "tv"');
-    }
     const rated = await this.ratingRepo.rate(
       userId,
       tmdbId,
-      title,
-      mediaType,
       rating,
       comment,
     );
@@ -43,8 +36,6 @@ export class RateItemUseCase {
         userId,
         'rated',
         tmdbId,
-        title,
-        mediaType,
         comment,
         new Date(),
       ),

@@ -14,8 +14,6 @@ export class ActivityLogRepositoryImpl implements ActivityLogRepository {
         userId: activity.userId,
         action: activity.action,
         tmdbId: activity.tmdbId,
-        title: activity.title,
-        mediaType: activity.mediaType,
         details: activity.details,
       },
     });
@@ -34,8 +32,6 @@ export class ActivityLogRepositoryImpl implements ActivityLogRepository {
           log.userId,
           log.action,
           log.tmdbId,
-          log.title,
-          log.mediaType ?? undefined,
           log.details ?? undefined,
           log.createdAt,
         ),

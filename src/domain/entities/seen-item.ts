@@ -1,11 +1,11 @@
+import { Tmdb } from "./tmdb";
+
 export class SeenItem {
   constructor(
     public readonly userId: string,
     public readonly tmdbId: number,
-    public readonly title: string,
-    public readonly mediaType: 'movie' | 'tv',
     public readonly watchedAt: Date = new Date(),
     public readonly createdAt: Date = new Date(),
-    public readonly posterUrl?: string,
+    public readonly tmdb?: Tmdb,
   ) {}
 }

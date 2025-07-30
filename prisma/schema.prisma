@@ -8,17 +8,17 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
+  id             String   @id @default(cuid())
+  email          String   @unique
   password       String
   fullName       String
   birthDate      DateTime?
-  gender         String? // 'M', 'F', 'X', u otro
-  country        String? // ISO country code: CL, AR, etc.
-  language       String? // 'es', 'en', etc.
-  favoriteGenres String[] // Prisma permite arrays de strings (Postgres)
-  emailVerified  Boolean   @default(false)
-  createdAt      DateTime  @default(now())
+  gender         String?
+  country        String?
+  language       String?
+  favoriteGenres String[]
+  emailVerified  Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   seenItems              SeenItem[]
   ratings                Rating[]
@@ -48,16 +48,35 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Tmdb {
+  id          Int      @id // tmdbId como clave primaria
+  title       String
+  overview    String?
+  posterUrl   String?
+  releaseDate DateTime?
+  genreIds    Int[]
+  popularity  Float?
+  voteAverage Float?
+  mediaType   String   // 'movie' | 'tv'
+  trailerUrl  String?
+  platforms   Json? // Ej: ['Netflix', 'Disney+', 'HBO Max']
+  createdAt   DateTime @default(now())
+
+  seenItems        SeenItem[]
+  ratings          Rating[]
+  favorites        Favorite[]
+  recommendations  Recommendation[]
+  activityLogs     ActivityLog[]
+}
+
 model SeenItem {
   id        String   @id @default(cuid())
   userId    String
   tmdbId    Int
-  title     String
-  mediaType String
-  posterUrl String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
 }
@@ -66,14 +85,12 @@ model Rating {
   id        String   @id @default(cuid())
   userId    String
   tmdbId    Int
-  title     String
-  mediaType String
-  rating    Float // Por ejemplo de 1.5 a 5.0
+  rating    Float
   comment   String?
-  posterUrl String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
 }
@@ -82,47 +99,35 @@ model Favorite {
   id        String   @id @default(cuid())
   userId    String
   tmdbId    Int
-  title     String
-  mediaType String
-  posterUrl String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
 }
-
 
 model Recommendation {
-  id          String   @id @default(cuid())
-  userId      String
-  tmdbId      Int
-  title       String
-  reason      String
-  posterUrl   String?   
-  overview    String?   
-  releaseDate DateTime? 
-  genreIds    Int[]     
-  popularity  Float?    
-  voteAverage Float?    
-  mediaType   String?   // : 'movie' | 'tv'
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  tmdbId    Int
+  reason    String
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
 }
-
 
 model ActivityLog {
   id        String   @id @default(cuid())
   userId    String
-  action    String   // Ej: 'SEEN', 'FAVORITE_ADDED', 'FAVORITE_REMOVED', 'RATED'
+  action    String
   tmdbId    Int
-  title     String
-  mediaType String?
-  details   String?  // Comentario, puntuación, etc.
+  details   String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 }

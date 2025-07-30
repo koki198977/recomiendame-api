@@ -33,7 +33,6 @@ export class FavoriteController {
     await this.addFavorite.execute(
       user.sub,
       body.tmdbId,
-      body.title,
       body.mediaType,
     );
     return { message: 'Agregado a favoritos' };
