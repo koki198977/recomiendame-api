@@ -1,5 +1,5 @@
 // src/infrastructure/controllers/recommendations.controller.ts
-import { Controller, Get, Post, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, Request, Body } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.strategy';
 import { GenerateRecommendationsUseCase } from 'src/application/use-cases/generate-recommendations.use-case';
 import { GetRecommendationsUseCase } from 'src/application/use-cases/get-recommendations.use-case';
@@ -15,9 +15,11 @@ export class RecommendationController {
 
   // Genera y guarda 5 nuevas recomendaciones
   @Post()
-  async generate(@Request() req): Promise<{ recommendations: RecommendationResponse[] }> {
-    await this.generateRecs.execute(req.user.sub);
-    // luego devuelvo el listado enriquecido
+  async generate(
+    @Request() req,
+    @Body() body: { feedback?: string; tmdbId?: number } // 👈 nuevo input opcional
+  ): Promise<{ recommendations: RecommendationResponse[] }> {
+    await this.generateRecs.execute(req.user.sub, body?.feedback, body?.tmdbId);
     const enriched = await this.getRecs.execute(req.user.sub);
     return { recommendations: enriched };
   }

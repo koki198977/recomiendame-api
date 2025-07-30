@@ -28,7 +28,7 @@ export class GenerateRecommendationsUseCase {
     private readonly tmdbRepository: TmdbRepository,
   ) {}
 
-  async execute(userId: string): Promise<Recommendation[]> {
+  async execute(userId: string, feedback?: string, tmdbId?: number): Promise<Recommendation[]> {
     const [seen, favorites, ratings, previous, user] = await Promise.all([
       this.userDataRepo.getSeenItems(userId),
       this.userDataRepo.getFavorites(userId),
@@ -40,18 +40,33 @@ export class GenerateRecommendationsUseCase {
     const previouslyRecommendedTitles = previous.map((r) => r.tmdb?.title.toLowerCase());
     const favoriteGenres = user?.favoriteGenres || [];
 
-    const prompt = `Eres un recomendador de películas y series.
-        Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.
-        NO repitas títulos y prioriza los siguientes géneros favoritos del usuario: ${favoriteGenres.join(', ') || 'ninguno'}.
+    const likedTitle = tmdbId
+      ? (await this.tmdbRepository.findById(tmdbId))?.title
+      : undefined;
 
-        🎬 Vistos: ${seen.map((s) => s.tmdb?.title).join(', ') || 'ninguno'}
-        ⭐ Favoritos: ${favorites.map((f) => f.tmdb?.title).join(', ') || 'ninguno'}
-        📝 Puntuaciones: ${ratings.map((r) => `${r.tmdb?.title} (${r.rating}/5)`).join(', ') || 'ninguna'}
-        ❌ Ya recomendadas: ${previouslyRecommendedTitles.join(', ') || 'ninguna'}
+    const prompt = feedback
+      ? `
+  Eres un recomendador personalizado de películas y series.
+  A partir del siguiente texto del usuario, genera 5 títulos relevantes sin repetir anteriores.
 
-        Devuelve solo los nombres de las películas o series, separados por coma o numerados.`;
-    
+  🧠 Feedback del usuario: ${feedback}
+  🎬 Ya vistas: ${seen.map((s) => s.tmdb?.title).join(', ') || 'ninguna'}
+  ⭐ Favoritas: ${favorites.map((f) => f.tmdb?.title).join(', ') || 'ninguna'}
+  📝 Puntuaciones: ${ratings.map((r) => `${r.tmdb?.title} (${r.rating}/5)`).join(', ') || 'ninguna'}
+  ❌ Ya recomendadas: ${previouslyRecommendedTitles.join(', ') || 'ninguna'}
+  ${likedTitle ? `👍 Le gustó: ${likedTitle}` : ''}
+      `.trim()
+      : `
+  Eres un recomendador de películas y series.
+  Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.
+  NO repitas títulos y prioriza los siguientes géneros favoritos del usuario: ${favoriteGenres.join(', ') || 'ninguno'}.
 
+  🎬 Vistos: ${seen.map((s) => s.tmdb?.title).join(', ') || 'ninguno'}
+  ⭐ Favoritos: ${favorites.map((f) => f.tmdb?.title).join(', ') || 'ninguno'}
+  📝 Puntuaciones: ${ratings.map((r) => `${r.tmdb?.title} (${r.rating}/5)`).join(', ') || 'ninguna'}
+  ❌ Ya recomendadas: ${previouslyRecommendedTitles.join(', ') || 'ninguna'}
+      `.trim();
+  
     const rawResponse = await this.openAi.generate(prompt);
     const parsed = this.parseRecommendations(rawResponse);
 
@@ -131,23 +146,25 @@ export class GenerateRecommendationsUseCase {
   private parseRecommendations(rawResponse: string): string[] {
     const fullText = Array.isArray(rawResponse) ? rawResponse.join('\n') : rawResponse;
 
-    const matches = fullText.match(/\d+\.\s+[^\n]+/g);
-    let titles: string[] = [];
+    const lines = fullText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.match(/^\d+\./));
 
-    if (matches) {
-      titles = matches.map((line) => line.replace(/^\d+\.\s*/, '').trim());
-    } else {
-      titles = fullText
-        .split(',')
-        .map((title) => title.trim())
-        .filter((title) => title.length > 0);
-    }
+    const titles: string[] = lines.map((line) => {
+      // Ejemplo de línea: "1. **Ex Machina** (Película): Una historia..."
+      const match = line.match(/^\d+\.\s+\**(.+?)\**\s*(\(|\-|:)/); // busca entre asteriscos
+      if (match) return match[1].trim();
 
-    return titles.map((t) => {
-      const match = t.match(/"(.+?)"/);
-      return match ? match[1] : t;
+      const fallback = line.replace(/^\d+\.\s*/, '').replace(/\*\*/g, '').trim();
+      const stopIndex = fallback.search(/[:(]/);
+      return stopIndex !== -1 ? fallback.slice(0, stopIndex).trim() : fallback;
     });
+
+    return titles.filter((t) => t.length > 0);
   }
+
+
 
 
   isUniqueConstraintError(error: any): boolean {
