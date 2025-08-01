@@ -29,6 +29,7 @@ export class GenerateRecommendationsUseCase {
   ) {}
 
   async execute(userId: string, feedback?: string, tmdbId?: number): Promise<Recommendation[]> {
+    // 1. Obtengo todos los datos
     const [seen, favorites, ratings, previous, user] = await Promise.all([
       this.userDataRepo.getSeenItems(userId),
       this.userDataRepo.getFavorites(userId),
@@ -37,38 +38,59 @@ export class GenerateRecommendationsUseCase {
       this.userRepo.findById(userId),
     ]);
 
-    const previouslyRecommendedTitles = previous.map((r) => r.tmdb?.title.toLowerCase());
     const favoriteGenres = user?.favoriteGenres || [];
 
-    const likedTitle = tmdbId
-      ? (await this.tmdbRepository.findById(tmdbId))?.title
-      : undefined;
+    // 2. Saco sólo los últimos 5 de cada uno
+    const last5 = <T>(arr: T[]) => arr.slice(-5);
+    const seen5    = last5(seen.map(s => s.tmdb?.title).filter(Boolean) as string[]);
+    const fav5     = last5(favorites.map(f => f.tmdb?.title).filter(Boolean) as string[]);
+    const ratings5 = last5(ratings.map(r => `${r.tmdb?.title} (${r.rating}/5)`).filter(Boolean) as string[]);
+    const prev5    = last5(previous.map(r => r.tmdb?.title.toLowerCase()).filter(Boolean) as string[]);
 
-    const prompt = feedback
-      ? `
-  Eres un recomendador personalizado de películas y series.
-  A partir del siguiente texto del usuario, genera 5 títulos relevantes sin repetir anteriores.
+    // 3. Construyo dinámicamente las secciones del prompt
+    const sections: string[] = [];
 
-  🧠 Feedback del usuario: ${feedback}
-  🎬 Ya vistas: ${seen.map((s) => s.tmdb?.title).join(', ') || 'ninguna'}
-  ⭐ Favoritas: ${favorites.map((f) => f.tmdb?.title).join(', ') || 'ninguna'}
-  📝 Puntuaciones: ${ratings.map((r) => `${r.tmdb?.title} (${r.rating}/5)`).join(', ') || 'ninguna'}
-  ❌ Ya recomendadas: ${previouslyRecommendedTitles.join(', ') || 'ninguna'}
-  ${likedTitle ? `👍 Le gustó: ${likedTitle}` : ''}
-      `.trim()
-      : `
-  Eres un recomendador de películas y series.
-  Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.
-  NO repitas títulos y prioriza los siguientes géneros favoritos del usuario: ${favoriteGenres.join(', ') || 'ninguno'}.
+    // Encabezado según feedback o no
+    if (feedback) {
+      sections.push(
+        'Eres un recomendador personalizado de películas y series. A partir del siguiente texto del usuario, genera 5 títulos relevantes sin repetir anteriores.'
+      );
+      sections.push(`🧠 Feedback del usuario: ${feedback}`);
+    } else {
+      sections.push(
+        'Eres un recomendador de películas y series. Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.'
+      );
+      if (favoriteGenres.length) {
+        sections.push(
+          `Prioriza los géneros favoritos del usuario: ${favoriteGenres.join(', ')}`
+        );
+      }
+    }
 
-  🎬 Vistos: ${seen.map((s) => s.tmdb?.title).join(', ') || 'ninguno'}
-  ⭐ Favoritos: ${favorites.map((f) => f.tmdb?.title).join(', ') || 'ninguno'}
-  📝 Puntuaciones: ${ratings.map((r) => `${r.tmdb?.title} (${r.rating}/5)`).join(', ') || 'ninguna'}
-  ❌ Ya recomendadas: ${previouslyRecommendedTitles.join(', ') || 'ninguna'}
-      `.trim();
-  
+    // Añadir cada sección sólo si hay datos
+    if (seen5.length)    sections.push(`🎬 Vistos (últ. 5): ${seen5.join(', ')}`);
+    if (fav5.length)     sections.push(`⭐ Favoritas (últ. 5): ${fav5.join(', ')}`);
+    if (ratings5.length) sections.push(`📝 Puntuaciones (últ. 5): ${ratings5.join(', ')}`);
+    if (prev5.length)    sections.push(`❌ Ya recomendadas (últ. 5): ${prev5.join(', ')}`);
+
+    // Si hay un título “gustado” específico
+    if (tmdbId) {
+      const liked = await this.tmdbRepository.findById(tmdbId);
+      if (liked?.title) {
+        sections.push(`👍 Le gustó: ${liked.title}`);
+      }
+    }
+
+    // 4. Instrucción final: sólo títulos
+    sections.push(
+      '⚠️ Importante: responde únicamente con los nombres de las películas o series, uno por línea, sin numeración, sin comillas ni descripciones.'
+    );
+
+    // 5. Uno todo en un solo string
+    const prompt = sections.join('\n').trim();
     const rawResponse = await this.openAi.generate(prompt);
     const parsed = this.parseRecommendations(rawResponse);
+    
 
     const savedRecommendations: Recommendation[] = [];
 
@@ -82,18 +104,18 @@ export class GenerateRecommendationsUseCase {
           return;
         }
 
-        const tmdbId = firstMatch.id;
+        const tmdbIdMatch = firstMatch.id;
         const reason = `Recomendado por similitud con tus gustos`;
 
         try {
-          const genreIds = Array.isArray(firstMatch.genreIds) ? firstMatch.genreIds : [];
+          const genreIds   = Array.isArray(firstMatch.genreIds) ? firstMatch.genreIds : [];
           const popularity = typeof firstMatch.popularity === 'number' ? firstMatch.popularity : 0;
-          const voteAverage = typeof firstMatch.voteAverage === 'number' ? firstMatch.voteAverage : 0;
-          const mediaType = firstMatch.mediaType ?? 'movie';
+          const voteAvg    = typeof firstMatch.voteAverage === 'number' ? firstMatch.voteAverage : 0;
+          const mediaType  = firstMatch.mediaType ?? 'movie';
 
           await this.tmdbRepository.save(
             new Tmdb(
-              tmdbId,
+              tmdbIdMatch,
               firstMatch.title,
               new Date(),
               firstMatch.posterUrl ?? undefined,
@@ -101,7 +123,7 @@ export class GenerateRecommendationsUseCase {
               firstMatch.releaseDate ? new Date(firstMatch.releaseDate) : undefined,
               genreIds,
               popularity,
-              voteAverage,
+              voteAvg,
               mediaType,
               firstMatch.platforms ?? [],
               firstMatch.trailerUrl ?? undefined,
@@ -111,7 +133,7 @@ export class GenerateRecommendationsUseCase {
           const recommendation = new Recommendation(
             cuid(),
             userId,
-            tmdbId,
+            tmdbIdMatch,
             reason,
             new Date(),
           );
@@ -124,14 +146,14 @@ export class GenerateRecommendationsUseCase {
               undefined,
               userId,
               'recommended',
-              tmdbId,
+              tmdbIdMatch,
               reason,
               new Date(),
             )
           );
         } catch (error) {
           if (this.isUniqueConstraintError(error)) {
-            console.log(`🔁 Ya se había recomendado: ${title} (tmdbId: ${tmdbId})`);
+            console.log(`🔁 Ya se había recomendado: ${title} (tmdbId: ${tmdbIdMatch})`);
           } else {
             throw error;
           }
@@ -139,35 +161,18 @@ export class GenerateRecommendationsUseCase {
       })
     );
 
-
     return savedRecommendations;
   }
 
   private parseRecommendations(rawResponse: string): string[] {
     const fullText = Array.isArray(rawResponse) ? rawResponse.join('\n') : rawResponse;
-
-    const lines = fullText
+    return fullText
       .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.match(/^\d+\./));
-
-    const titles: string[] = lines.map((line) => {
-      // Ejemplo de línea: "1. **Ex Machina** (Película): Una historia..."
-      const match = line.match(/^\d+\.\s+\**(.+?)\**\s*(\(|\-|:)/); // busca entre asteriscos
-      if (match) return match[1].trim();
-
-      const fallback = line.replace(/^\d+\.\s*/, '').replace(/\*\*/g, '').trim();
-      const stopIndex = fallback.search(/[:(]/);
-      return stopIndex !== -1 ? fallback.slice(0, stopIndex).trim() : fallback;
-    });
-
-    return titles.filter((t) => t.length > 0);
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
   }
 
-
-
-
-  isUniqueConstraintError(error: any): boolean {
+  private isUniqueConstraintError(error: any): boolean {
     return error?.code === 'P2002';
   }
 }

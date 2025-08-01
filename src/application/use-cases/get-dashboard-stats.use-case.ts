@@ -25,7 +25,7 @@ export class GetDashboardStatsUseCase {
       this.favoriteRepo.findAllByUser(userId),
       this.ratingRepo.getRatingsByUser(userId),
       this.getUserById.execute(userId),
-      this.recommendationRepo.findLatestByUser(userId, 5),
+      this.recommendationRepo.findLatestByUser(userId, 7),
     ]);
 
     const seen = seenData.items;
@@ -34,7 +34,7 @@ export class GetDashboardStatsUseCase {
 
     const stats = {
       seenTotal: seenData.total,
-      favoriteTotal: favorites.length,
+      favoriteTotal: favoritesData.total,
       ratingsTotal: ratingsData.total,
       averageRating:
         ratings.length > 0
@@ -56,6 +56,9 @@ export class GetDashboardStatsUseCase {
       recentRecommendations: recentRecommendations.map((r) => ({
         title: r.tmdb?.title,
         tmdbId: r.tmdbId,
+        mediaType: r.tmdb?.mediaType,
+        overview: r.tmdb?.overview,
+        voteAverage: r.tmdb?.voteAverage,
         reason: r.reason,
         posterUrl: r.tmdb?.posterUrl,
         createdAt: r.createdAt,
