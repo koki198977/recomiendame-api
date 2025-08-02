@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 
@@ -26,7 +26,12 @@ export class CreateUserUseCase {
     favoriteGenres?: string[];
   }): Promise<User> {
     const existing = await this.userRepo.findByEmail(input.email);
-    if (existing) throw new Error('Email already in use');
+    if (existing) {
+    throw new HttpException(
+      { message: 'Correo ya se encuentra registrado' },
+      HttpStatus.CONFLICT,
+    );
+  }
 
     const hashedPassword = await bcrypt.hash(input.password, 10);
 
