@@ -22,13 +22,11 @@ export class UserController {
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly deleteUserUseCase: DeleteUserUseCase,
     private readonly getUserById: GetUserByIdUseCase,
-    private readonly sendWelcome: SendWelcomeEmailUseCase,
 ) {}
 
   @Post()
   async register(@Body() dto: CreateUserDto) {
     await this.createUser.execute(dto);
-    await this.sendWelcome.execute(dto.email, dto.fullName);
     return { message: 'Usuario creado y correo enviado.' };
   }
 

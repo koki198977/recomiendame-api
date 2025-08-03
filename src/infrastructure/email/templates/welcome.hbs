@@ -2,38 +2,60 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>¡Bienvenido!</title>
-  <style>
-    /* Opcional: estilos inline simples */
-    body { font-family: Arial, sans-serif; color: #333; }
-    .container { max-width: 600px; margin: auto; padding: 1rem; }
-    h1 { color: #007bff; }
-    .btn {
-      display: inline-block;
-      background: #007bff;
-      color: #fff;
-      padding: 0.5rem 1rem;
-      text-decoration: none;
-      border-radius: 4px;
-    }
-  </style>
+  <title>¡Bienvenido a Recomiéndame!</title>
 </head>
-<body>
-  <div class="container">
-    <h1>¡Hola {{name}}!</h1>
-    <p>
-      Gracias por registrarte en <strong>Recomiéndame</strong>. Estamos muy contentos de tenerte con nosotros.
-    </p>
-    <p>
-      Ahora puedes explorar recomendaciones personalizadas de películas y series según tus gustos.
-    </p>
-    <p>
-      <a href="https://recomiendameapp.cl/login" class="btn">Accede a tu cuenta</a>
-    </p>
-    <hr />
-    <p style="font-size:0.8rem;color:#666;">
-      Si no fuiste tú quien se registró, ignora este correo.
-    </p>
-  </div>
+<body style="margin:0;padding:0;background-color:#000;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="margin:20px auto;padding:20px;background-color:#111;border-radius:8px;">
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <img src="{{logoUrl}}" alt="Recomiéndame Logo" width="150" style="display:block;" />
+            </td>
+          </tr>
+          <!-- Saludo -->
+          <tr>
+            <td style="color:#fff;font-family:Arial,sans-serif;text-align:center;padding-bottom:10px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;color:#a855f7;">¡Hola {{name}}!</h1>
+            </td>
+          </tr>
+          <!-- Texto -->
+          <tr>
+            <td style="color:#ccc;font-family:Arial,sans-serif;font-size:16px;line-height:1.5;text-align:center;padding:0 20px 20px;">
+              Gracias por registrarte en <strong style="color:#fff;">Recomiéndame</strong>.<br/>
+              Para completar tu registro, haz clic en el botón de abajo:
+            </td>
+          </tr>
+          <!-- Botón -->
+          <tr>
+            <td align="center" style="padding-bottom:30px;">
+              <a href="{{verifyUrl}}"
+                 style="
+                   background-color:#a855f7;
+                   color:#fff;
+                   text-decoration:none;
+                   padding:12px 24px;
+                   border-radius:8px;
+                   font-family:Arial,sans-serif;
+                   display:inline-block;
+                   font-size:16px;
+                 ">
+                Verificar mi correo
+              </a>
+            </td>
+          </tr>
+          <!-- Pie -->
+          <tr>
+            <td style="color:#666;font-family:Arial,sans-serif;font-size:12px;text-align:center;">
+              Si no solicitaste este correo, puedes ignorarlo.<br/>
+              © 2025 Recomiéndame
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>

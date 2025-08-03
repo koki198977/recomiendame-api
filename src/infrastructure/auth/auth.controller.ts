@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -20,15 +20,26 @@ export class AuthController {
       where: { email: body.email },
     });
 
-    if (!user || !(await bcrypt.compare(body.password, user.password))) {
-      throw new UnauthorizedException('Invalid credentials');
+    // Usuario no existe
+    if (!user) {
+      throw new UnauthorizedException({ message: 'Credenciales inválidas' });
     }
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-    };
+    // Email no verificado
+    if (!user.emailVerified) {
+      throw new HttpException(
+        { message: 'Debes confirmar tu correo antes de iniciar sesión' },
+        HttpStatus.FORBIDDEN,
+      );
+    }
 
+    // Contraseña incorrecta
+    const passwordMatches = await bcrypt.compare(body.password, user.password);
+    if (!passwordMatches) {
+      throw new UnauthorizedException({ message: 'Credenciales inválidas' });
+    }
+
+    const payload = { sub: user.id, email: user.email };
     const access_token = this.jwtService.sign(payload);
     return { access_token };
   }
@@ -36,13 +47,15 @@ export class AuthController {
   @Post('request-password-reset')
   async requestPasswordReset(@Body() body: { email: string }) {
     await this.requestPasswordResetUseCase.execute(body.email);
-    return { message: 'Si el email existe, se ha enviado un enlace para restablecer la contraseña' };
+    return {
+      message:
+        'Si el email existe, se ha enviado un enlace para restablecer la contraseña',
+    };
   }
 
-    @Post('reset-password')
-    async resetPassword(@Body() body: { token: string; newPassword: string }) {
-        await this.resetPasswordUseCase.execute(body.token, body.newPassword);
-        return { message: 'Contraseña actualizada correctamente' };
-    }
-
+  @Post('reset-password')
+  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+    await this.resetPasswordUseCase.execute(body.token, body.newPassword);
+    return { message: 'Contraseña actualizada correctamente' };
+  }
 }
