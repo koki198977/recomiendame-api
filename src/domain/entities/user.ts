@@ -11,5 +11,6 @@ export class User {
     public readonly country?: string,
     public readonly language?: string,
     public readonly favoriteGenres?: string[],
+    public readonly favoriteMedia?: string,
   ) {}
 }

@@ -10,6 +10,7 @@ import { User } from 'src/domain/entities/user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt.strategy';
+import { SendWelcomeEmailUseCase } from 'src/application/use-cases/send-welcome-email.use-case';
 
 @Controller('users')
 export class UserController {
@@ -21,11 +22,14 @@ export class UserController {
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly deleteUserUseCase: DeleteUserUseCase,
     private readonly getUserById: GetUserByIdUseCase,
+    private readonly sendWelcome: SendWelcomeEmailUseCase,
 ) {}
 
   @Post()
   async register(@Body() dto: CreateUserDto) {
-    return this.createUser.execute(dto);
+    await this.createUser.execute(dto);
+    await this.sendWelcome.execute(dto.email, dto.fullName);
+    return { message: 'Usuario creado y correo enviado.' };
   }
 
   @Get('verify-email')

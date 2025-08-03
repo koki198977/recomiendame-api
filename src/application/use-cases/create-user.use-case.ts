@@ -24,14 +24,15 @@ export class CreateUserUseCase {
     country?: string;
     language?: string;
     favoriteGenres?: string[];
+    favoriteMedia?: string;
   }): Promise<User> {
     const existing = await this.userRepo.findByEmail(input.email);
     if (existing) {
-    throw new HttpException(
-      { message: 'Correo ya se encuentra registrado' },
-      HttpStatus.CONFLICT,
-    );
-  }
+      throw new HttpException(
+        { message: 'Correo ya se encuentra registrado' },
+        HttpStatus.CONFLICT,
+      );
+    }
 
     const hashedPassword = await bcrypt.hash(input.password, 10);
 
@@ -44,6 +45,7 @@ export class CreateUserUseCase {
       country: input.country,
       language: input.language,
       favoriteGenres: input.favoriteGenres,
+      favoriteMedia: input.favoriteMedia,
       emailVerified: false,
       createdAt: new Date(),
     });

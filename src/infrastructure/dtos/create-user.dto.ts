@@ -24,10 +24,6 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
-  gender?: string;
-
-  @IsOptional()
-  @IsString()
   country?: string;
 
   @IsOptional()
@@ -37,4 +33,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsArray()
   favoriteGenres?: string[];
+
+  // Nuevo campo
+  @IsOptional()
+  @IsString()
+  favoriteMedia?: string;
 }

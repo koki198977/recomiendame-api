@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import https from 'https';
 import { TmdbDetails } from '../dtos/tmdb.types';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class TmdbService {
@@ -158,5 +159,19 @@ export class TmdbService {
     }
   }
 
+    async getTrending(limit: number): Promise<Array<{ id: number; title: string; mediaType: string }>> {
+        const url = `${this.baseUrl}/trending/all/week`;
+        const response = await firstValueFrom(
+          this.http.get(url, { params: { api_key: this.apiKey, language: 'es-ES' } })
+        );
+
+        const results = (response.data?.results ?? []) as any[];
+        return results.slice(0, limit).map(r => ({
+          id:        r.id,
+          title:     r.title ?? r.name,
+          mediaType: r.media_type,
+        }));
+    }
+    
 
 }

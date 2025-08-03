@@ -1,3 +1,4 @@
+// src/application/use-cases/generate-recommendations.use-case.ts
 import { Inject, Injectable } from '@nestjs/common';
 import { OpenAiService } from '../../infrastructure/ai/openai.service';
 import { USER_DATA_REPOSITORY, UserDataRepository } from '../ports/user-data.repository';
@@ -15,7 +16,7 @@ import { Tmdb } from 'src/domain/entities/tmdb';
 export class GenerateRecommendationsUseCase {
   constructor(
     private readonly openAi: OpenAiService,
-    private readonly tmdb: TmdbService,
+    private readonly tmdbService: TmdbService,
     @Inject(USER_DATA_REPOSITORY)
     private readonly userDataRepo: UserDataRepository,
     @Inject(USER_REPOSITORY)
@@ -28,29 +29,50 @@ export class GenerateRecommendationsUseCase {
     private readonly tmdbRepository: TmdbRepository,
   ) {}
 
-  async execute(userId: string, feedback?: string, tmdbId?: number): Promise<Recommendation[]> {
-    // 1. Obtengo todos los datos
-    const [seen, favorites, ratings, previous, user] = await Promise.all([
+  async execute(
+    userId: string,
+    feedback?: string,
+    tmdbId?: number
+  ): Promise<Recommendation[]> {
+    // 1) Cargar datos
+    const [
+      seenItems,
+      favorites,
+      ratings,
+      recentRecs,
+      allRecs,
+      user
+    ] = await Promise.all([
       this.userDataRepo.getSeenItems(userId),
       this.userDataRepo.getFavorites(userId),
       this.userDataRepo.getRatings(userId),
       this.recommendationRepo.findLatestByUser(userId, 10),
+      this.recommendationRepo.findAllByUser(userId),
       this.userRepo.findById(userId),
     ]);
 
-    const favoriteGenres = user?.favoriteGenres || [];
+    const favoriteGenres    = user?.favoriteGenres || [];
+    const favoriteMediaText = user?.favoriteMedia?.trim();
 
-    // 2. Saco sólo los últimos 5 de cada uno
+    // build sets
+    const recentTitles = new Set(
+      recentRecs.map(r => r.tmdb?.title.toLowerCase()).filter(Boolean)
+    );
+    const allPrevIds = new Set(allRecs.map(r => r.tmdbId));
+
+    // last 5 of seen/fav/ratings
     const last5 = <T>(arr: T[]) => arr.slice(-5);
-    const seen5    = last5(seen.map(s => s.tmdb?.title).filter(Boolean) as string[]);
-    const fav5     = last5(favorites.map(f => f.tmdb?.title).filter(Boolean) as string[]);
-    const ratings5 = last5(ratings.map(r => `${r.tmdb?.title} (${r.rating}/5)`).filter(Boolean) as string[]);
-    const prev5    = last5(previous.map(r => r.tmdb?.title.toLowerCase()).filter(Boolean) as string[]);
+    const seen5 = last5(seenItems.map(i => i.tmdb?.title).filter(Boolean) as string[]);
+    const fav5  = last5(favorites.map(f => f.tmdb?.title).filter(Boolean) as string[]);
+    const ratings5 = last5(
+      ratings
+        .map(r => `${r.tmdb?.title} (${r.rating}/5)`)
+        .filter(Boolean) as string[]
+    );
 
-    // 3. Construyo dinámicamente las secciones del prompt
+    // construct prompt
     const sections: string[] = [];
 
-    // Encabezado según feedback o no
     if (feedback) {
       sections.push(
         'Eres un recomendador personalizado de películas y series. A partir del siguiente texto del usuario, genera 5 títulos relevantes sin repetir anteriores.'
@@ -67,13 +89,18 @@ export class GenerateRecommendationsUseCase {
       }
     }
 
-    // Añadir cada sección sólo si hay datos
+    if (recentRecs.length === 0 && favoriteMediaText) {
+      sections.push(`📝 Sobre sus gustos: ${favoriteMediaText}`);
+    }
+
     if (seen5.length)    sections.push(`🎬 Vistos (últ. 5): ${seen5.join(', ')}`);
     if (fav5.length)     sections.push(`⭐ Favoritas (últ. 5): ${fav5.join(', ')}`);
     if (ratings5.length) sections.push(`📝 Puntuaciones (últ. 5): ${ratings5.join(', ')}`);
-    if (prev5.length)    sections.push(`❌ Ya recomendadas (últ. 5): ${prev5.join(', ')}`);
+    if (recentRecs.length) {
+      const prev5 = last5(recentRecs.map(r => r.tmdb?.title.toLowerCase()).filter(Boolean) as string[]);
+      sections.push(`❌ Ya recomendadas (últ. 5): ${prev5.join(', ')}`);
+    }
 
-    // Si hay un título “gustado” específico
     if (tmdbId) {
       const liked = await this.tmdbRepository.findById(tmdbId);
       if (liked?.title) {
@@ -81,98 +108,95 @@ export class GenerateRecommendationsUseCase {
       }
     }
 
-    // 4. Instrucción final: sólo títulos
     sections.push(
-      '⚠️ Importante: responde únicamente con los nombres de las películas o series, uno por línea, sin numeración, sin comillas ni descripciones.'
+      '⚠️ Si no puedes generar exactamente 5 títulos nuevos (que no estén en tu historial ni en recomendaciones previas), completa la lista con las películas o series más populares según la crítica.'
+    );
+    sections.push(
+      '⚠️ Responde únicamente con los nombres de las películas o series, uno por línea, sin numeración ni descripciones.'
     );
 
-    // 5. Uno todo en un solo string
-    const prompt = sections.join('\n').trim();
-    const rawResponse = await this.openAi.generate(prompt);
-    const parsed = this.parseRecommendations(rawResponse);
-    
+    const prompt = sections.join('\n');
+    const raw   = await this.openAi.generate(prompt);
+    const parsed = this.parseRecommendations(raw);
+    // filter out any titles seen in recent recs
+    const unique = Array.from(new Set(parsed))
+      .filter(title => !recentTitles.has(title.toLowerCase()));
 
-    const savedRecommendations: Recommendation[] = [];
-
-    await Promise.all(
-      parsed.map(async (title) => {
-        const searchResult = await this.tmdb.search(title);
-        const firstMatch = searchResult[0];
-
-        if (!firstMatch) {
-          console.warn(`🔍 No se encontró resultado para: "${title}"`);
-          return;
+    // complete with trending if fewer than 5
+    let finalTitles = unique.slice(0, 5);
+    if (finalTitles.length < 5) {
+      const needed = 5 - finalTitles.length;
+      const trending = await this.tmdbService.getTrending(needed);
+      for (const t of trending) {
+        if (finalTitles.length >= 5) break;
+        if (!finalTitles.includes(t.title)) {
+          finalTitles.push(t.title);
         }
+      }
+    }
+    // save only truly new recs (by tmdbId)
+    const response: Recommendation[] = [];
 
-        const tmdbIdMatch = firstMatch.id;
-        const reason = `Recomendado por similitud con tus gustos`;
+    for (const title of finalTitles) {
+      const results = await this.tmdbService.search(title);
+      const first = results[0];
+      if (!first) continue;
 
-        try {
-          const genreIds   = Array.isArray(firstMatch.genreIds) ? firstMatch.genreIds : [];
-          const popularity = typeof firstMatch.popularity === 'number' ? firstMatch.popularity : 0;
-          const voteAvg    = typeof firstMatch.voteAverage === 'number' ? firstMatch.voteAverage : 0;
-          const mediaType  = firstMatch.mediaType ?? 'movie';
+      // Si no estaba en DB, guardarlo
+      if (!allPrevIds.has(first.id)) {
+        await this.tmdbRepository.save(new Tmdb(
+          first.id,
+          first.title,
+          new Date(),
+          first.posterUrl ?? undefined,
+          first.overview ?? undefined,
+          first.releaseDate ? new Date(first.releaseDate) : undefined,
+          first.genreIds || [],
+          first.popularity || 0,
+          first.voteAverage || 0,
+          first.mediaType || 'movie',
+          first.platforms ?? [],
+          first.trailerUrl ?? undefined,
+        ));
 
-          await this.tmdbRepository.save(
-            new Tmdb(
-              tmdbIdMatch,
-              firstMatch.title,
-              new Date(),
-              firstMatch.posterUrl ?? undefined,
-              firstMatch.overview ?? undefined,
-              firstMatch.releaseDate ? new Date(firstMatch.releaseDate) : undefined,
-              genreIds,
-              popularity,
-              voteAvg,
-              mediaType,
-              firstMatch.platforms ?? [],
-              firstMatch.trailerUrl ?? undefined,
-            )
-          );
+        const rec = new Recommendation(
+          cuid(),
+          userId,
+          first.id,
+          'Recomendado por IA',
+          new Date(),
+        );
 
-          const recommendation = new Recommendation(
-            cuid(),
-            userId,
-            tmdbIdMatch,
-            reason,
-            new Date(),
-          );
+        await this.recommendationRepo.save(rec);
+        await this.activityLogRepo.log(new ActivityLog(
+          undefined,
+          userId,
+          'recommended',
+          first.id,
+          'Recomendado por IA',
+          new Date(),
+        ));
+      }
 
-          await this.recommendationRepo.save(recommendation);
-          savedRecommendations.push(recommendation);
+      // Agregamos a la respuesta (ya sea nuevo o existente)
+      response.push(new Recommendation(
+        cuid(),
+        userId,
+        first.id,
+        'Recomendado por IA',
+        new Date(),
+        first // asociamos metadata TMDB
+      ));
+    }
 
-          await this.activityLogRepo.log(
-            new ActivityLog(
-              undefined,
-              userId,
-              'recommended',
-              tmdbIdMatch,
-              reason,
-              new Date(),
-            )
-          );
-        } catch (error) {
-          if (this.isUniqueConstraintError(error)) {
-            console.log(`🔁 Ya se había recomendado: ${title} (tmdbId: ${tmdbIdMatch})`);
-          } else {
-            throw error;
-          }
-        }
-      })
-    );
-
-    return savedRecommendations;
+    return response;
   }
 
-  private parseRecommendations(rawResponse: string): string[] {
-    const fullText = Array.isArray(rawResponse) ? rawResponse.join('\n') : rawResponse;
-    return fullText
+  private parseRecommendations(raw: string | string[]): string[] {
+    const text = Array.isArray(raw) ? raw.join('\n') : raw;
+    return text
       .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-  }
-
-  private isUniqueConstraintError(error: any): boolean {
-    return error?.code === 'P2002';
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
   }
 }

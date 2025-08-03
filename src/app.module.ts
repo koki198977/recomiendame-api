@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './infrastructure/auth/auth.module';
@@ -54,6 +54,9 @@ import { TmdbRepositoryImpl } from './infrastructure/repositories/tmdb.repositor
 import { GetRecommendationsUseCase } from './application/use-cases/get-recommendations.use-case';
 import { RemoveSeenUseCase } from './application/use-cases/remove-seen.use-case';
 import { RemoveRatingUseCase } from './application/use-cases/remove-rating.use-case';
+import { EmailModule } from './infrastructure/email/email.module';
+import { SendWelcomeEmailUseCase } from './application/use-cases/send-welcome-email.use-case';
+import { EmailAdapter } from './infrastructure/email/email.adapter';
 
 
 
@@ -63,7 +66,8 @@ import { RemoveRatingUseCase } from './application/use-cases/remove-rating.use-c
     AuthModule,
     PrismaModule,
     JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
-    TmdbModule
+    TmdbModule,
+    EmailModule,
   ],
   controllers: [AppController, SeenController, UserController, FavoriteController, RatingController, RecommendationController, ActivityLogController, DashboardController],
   providers: [
@@ -119,7 +123,9 @@ import { RemoveRatingUseCase } from './application/use-cases/remove-rating.use-c
     {
       provide: TMDB_REPOSITORY,
       useClass: TmdbRepositoryImpl,
-    }
-  ]
+    },
+    SendWelcomeEmailUseCase
+  ],
+  exports: [SendWelcomeEmailUseCase],
 })
 export class AppModule {}
