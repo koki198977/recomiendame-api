@@ -13,6 +13,7 @@ import { ConsoleMailService } from '../services/mail.service.impl';
 import { USER_REPOSITORY } from 'src/application/ports/user.repository';
 import { UserRepositoryImpl } from '../repositories/user.repository.impl';
 import { ResetPasswordUseCase } from 'src/application/use-cases/reset-password.use-case';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ResetPasswordUseCase } from 'src/application/use-cases/reset-password.u
       }),
       inject: [ConfigService],
     }),
+    EmailModule,
   ],
   controllers: [AuthController],
   providers: [

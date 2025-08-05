@@ -56,9 +56,6 @@ import { RemoveSeenUseCase } from './application/use-cases/remove-seen.use-case'
 import { RemoveRatingUseCase } from './application/use-cases/remove-rating.use-case';
 import { EmailModule } from './infrastructure/email/email.module';
 import { SendWelcomeEmailUseCase } from './application/use-cases/send-welcome-email.use-case';
-import { EmailAdapter } from './infrastructure/email/email.adapter';
-
-
 
 @Module({
   imports: [
@@ -124,7 +121,7 @@ import { EmailAdapter } from './infrastructure/email/email.adapter';
       provide: TMDB_REPOSITORY,
       useClass: TmdbRepositoryImpl,
     },
-    SendWelcomeEmailUseCase
+    SendWelcomeEmailUseCase,
   ],
   exports: [SendWelcomeEmailUseCase],
 })

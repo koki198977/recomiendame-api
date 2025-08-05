@@ -1,21 +1,24 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { USER_REPOSITORY, UserRepository } from '../ports/user.repository';
-import { PASSWORD_RESET_TOKEN_REPOSITORY, PasswordResetTokenRepository } from '../ports/password-reset-token.repository';
+import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { addMinutes } from 'date-fns';
-import { MAIL_SERVICE, MailService } from '../ports/mail.service';
+import { USER_REPOSITORY, UserRepository } from '../ports/user.repository';
+import { PASSWORD_RESET_TOKEN_REPOSITORY, PasswordResetTokenRepository } from '../ports/password-reset-token.repository';
+import { IEmailService } from 'src/domain/ports/email.service';
 
 @Injectable()
 export class RequestPasswordResetUseCase {
   constructor(
+    @Inject('IEmailService')
+    private readonly emailService: IEmailService,
+    
     @Inject(USER_REPOSITORY)
     private readonly userRepo: UserRepository,
 
     @Inject(PASSWORD_RESET_TOKEN_REPOSITORY)
     private readonly tokenRepo: PasswordResetTokenRepository,
-    
-    @Inject(MAIL_SERVICE)
-    private readonly mailService: MailService,
+
+    private readonly config: ConfigService,
   ) {}
 
   async execute(email: string): Promise<void> {
@@ -27,12 +30,18 @@ export class RequestPasswordResetUseCase {
 
     await this.tokenRepo.create(user.id, token, expiresAt);
 
-    const resetUrl = `https://recomiendame.app/reset-password?token=${token}`;
+    // toma la URL del front desde env (fallback al localhost)
+    const apiUrl    = this.config.get<string>('API_URL');
+    const frontUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:8080');
+    const resetUrl = `${frontUrl}/reset-password?token=${token}`;
+    const logoUrl = `${apiUrl}/static/assets/logo.png`;
 
-    await this.mailService.send({
-      to: user.email,
-      subject: 'Recuperación de contraseña',
-      body: `Haz clic en el siguiente enlace para recuperar tu contraseña:\n\n${resetUrl}`,
-    });
+    // usa plantilla Handlebars
+     await this.emailService.sendMail(
+      user.email,
+      'Recuperación de contraseña',
+      'reset-password',
+      { fullName: user.fullName, logoUrl, resetUrl, expiresInMinutes: 30, },
+    );
   }
 }

@@ -15,11 +15,6 @@ import { EmailAdapter } from './email.adapter';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-    // Aquí ya puedes loguear tus vars de entorno:
-    console.log('SMTP user:', config.get('MAIL_USER'));
-    console.log('SMTP pass length:', config.get<string>('MAIL_PASS')?.length);
-
-    // Y luego devuelves la configuración válida:
     return {
       transport: {
         service: 'gmail',

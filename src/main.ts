@@ -14,6 +14,11 @@ async function bootstrap() {
     }),
   );
   app.use('/static', express.static(join(__dirname, '..', 'public')));
+  app.enableCors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
