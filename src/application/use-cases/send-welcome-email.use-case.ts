@@ -16,13 +16,14 @@ export class SendWelcomeEmailUseCase {
     token: string,
   ) {
     const apiUrl    = this.config.get<string>('API_URL');
-    const verifyUrl = `${apiUrl}/users/verify-email?token=${token}`;
+    const frontUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:8080');
+    const verifyUrl = `${frontUrl}/email-confirmed?token=${token}`;
     const logoUrl = `${apiUrl}/static/assets/logo.png`;
 
     await this.emailService.sendMail(
       userEmail,
       'Confirma tu correo en Recomiéndame',
-      'welcome',    // welcome.hbs
+      'welcome',
       { fullName: userName, logoUrl, verifyUrl },
     );
   }

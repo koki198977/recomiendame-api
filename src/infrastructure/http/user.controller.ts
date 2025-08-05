@@ -32,8 +32,8 @@ export class UserController {
 
   @Get('verify-email')
   async verify(@Query('token') token: string) {
-    await this.verifyEmail.execute(token);
-    return { message: 'Correo verificado con éxito' };
+    const status = await this.verifyEmail.execute(token);
+    return { status };
   }
 
   @Get()

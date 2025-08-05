@@ -5,6 +5,7 @@ import {
 } from '../ports/email-token.repository';
 import { USER_REPOSITORY, UserRepository } from '../ports/user.repository';
 
+export type VerifyStatus = 'success' | 'expired' | 'invalid';
 @Injectable()
 export class VerifyEmailUseCase {
   constructor(
@@ -14,15 +15,20 @@ export class VerifyEmailUseCase {
     private readonly userRepo: UserRepository,
   ) {}
 
-  async execute(token: string): Promise<void> {
+  async execute(token: string): Promise<VerifyStatus> {
     const tokenData = await this.tokenRepo.findByToken(token);
-    if (!tokenData) throw new NotFoundException('Token inválido');
+    if (!tokenData) {
+      return 'invalid';
+    }
 
     if (tokenData.expiresAt < new Date()) {
-      throw new BadRequestException('Token expirado');
+      await this.tokenRepo.deleteById(tokenData.id);
+      return 'expired';
     }
 
     await this.userRepo.verifyEmail(tokenData.userId);
     await this.tokenRepo.deleteById(tokenData.id);
+
+    return 'success';
   }
 }
