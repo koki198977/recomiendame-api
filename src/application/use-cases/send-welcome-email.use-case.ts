@@ -23,7 +23,7 @@ export class SendWelcomeEmailUseCase {
       userEmail,
       'Confirma tu correo en Recomiéndame',
       'welcome',    // welcome.hbs
-      { name: userName, logoUrl, verifyUrl },
+      { fullName: userName, logoUrl, verifyUrl },
     );
   }
 }

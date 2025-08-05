@@ -2,43 +2,36 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Recuperación de contraseña | Recomiéndame</title>
+  <title>¡Bienvenido a Recomiéndame!</title>
 </head>
 <body style="margin:0;padding:0;background-color:#000;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000;">
     <tr>
       <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0"
-               style="margin:20px auto;padding:20px;background-color:#111;border-radius:8px;">
-          
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="margin:20px auto;padding:20px;background-color:#111;border-radius:8px;">
           <!-- Logo -->
           <tr>
             <td align="center" style="padding-bottom:20px;">
               <img src="{{logoUrl}}" alt="Recomiéndame Logo" width="150" style="display:block;" />
             </td>
           </tr>
-          
-          <!-- Título -->
+          <!-- Saludo -->
           <tr>
             <td style="color:#fff;font-family:Arial,sans-serif;text-align:center;padding-bottom:10px;">
-              <h1 style="margin:0;font-size:24px;font-weight:bold;color:#a855f7;">
-                Recupera tu contraseña, {{fullName}}
-              </h1>
+              <h1 style="margin:0;font-size:24px;font-weight:bold;color:#a855f7;">¡Hola {{fullName}}!</h1>
             </td>
           </tr>
-          
           <!-- Texto -->
           <tr>
             <td style="color:#ccc;font-family:Arial,sans-serif;font-size:16px;line-height:1.5;text-align:center;padding:0 20px 20px;">
-              Has solicitado restablecer tu contraseña.  
-              Haz clic en el botón de abajo para continuar.
+              Gracias por registrarte en <strong style="color:#fff;">Recomiéndame</strong>.<br/>
+              Para completar tu registro, haz clic en el botón de abajo:
             </td>
           </tr>
-          
           <!-- Botón -->
           <tr>
             <td align="center" style="padding-bottom:30px;">
-              <a href="{{resetUrl}}"
+              <a href="{{verifyUrl}}"
                  style="
                    background-color:#a855f7;
                    color:#fff;
@@ -49,26 +42,17 @@
                    display:inline-block;
                    font-size:16px;
                  ">
-                Restablecer contraseña
+                Verificar mi correo
               </a>
             </td>
           </tr>
-          
-          <!-- Nota de expiración -->
-          <tr>
-            <td style="color:#666;font-family:Arial,sans-serif;font-size:14px;text-align:center;padding:0 20px 20px;">
-              Este enlace expirará en {{expiresInMinutes}} minutos.
-            </td>
-          </tr>
-          
           <!-- Pie -->
           <tr>
             <td style="color:#666;font-family:Arial,sans-serif;font-size:12px;text-align:center;">
-              Si no solicitaste este cambio, puedes ignorar este correo.<br/>
-              © {{year}} Recomiéndame
+              Si no solicitaste este correo, puedes ignorarlo.<br/>
+              © 2025 Recomiéndame
             </td>
           </tr>
-          
         </table>
       </td>
     </tr>

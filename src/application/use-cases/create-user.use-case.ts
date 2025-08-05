@@ -66,13 +66,12 @@ export class CreateUserUseCase {
     // 4. Construir URL de verificación
     const apiUrl   = this.config.get<string>('API_URL');
     const verifyUrl = `${apiUrl}/users/verify-email?token=${token}`;
-    console.log(`🔗 Verificación URL: ${verifyUrl}`);
 
     // 5. Enviar correo de bienvenida/confirmación
     await this.sendWelcomeEmail.execute(
       user.email,
       user.fullName,
-      token,           // necesitas ajustar execute para recibir token
+      token,
     );
 
     return user;
