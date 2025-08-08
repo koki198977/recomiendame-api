@@ -56,6 +56,12 @@ import { RemoveSeenUseCase } from './application/use-cases/remove-seen.use-case'
 import { RemoveRatingUseCase } from './application/use-cases/remove-rating.use-case';
 import { EmailModule } from './infrastructure/email/email.module';
 import { SendWelcomeEmailUseCase } from './application/use-cases/send-welcome-email.use-case';
+import { WishListController } from './infrastructure/http/wishlist.controller';
+import { GetWishListUseCase } from './application/use-cases/get-wishlist.use-case';
+import { AddToWishListUseCase } from './application/use-cases/add-to-wishlist.use-case';
+import { RemoveFromWishListUseCase } from './application/use-cases/remove-from-wishlist.use-case';
+import { WISHLIST_REPOSITORY } from './application/ports/wishlist.repository';
+import { WishListRepositoryImpl } from './infrastructure/repositories/wishlist.repository';
 
 @Module({
   imports: [
@@ -66,7 +72,10 @@ import { SendWelcomeEmailUseCase } from './application/use-cases/send-welcome-em
     TmdbModule,
     EmailModule,
   ],
-  controllers: [AppController, SeenController, UserController, FavoriteController, RatingController, RecommendationController, ActivityLogController, DashboardController],
+  controllers: [
+    AppController, SeenController, UserController, FavoriteController, RatingController, 
+    RecommendationController, ActivityLogController, DashboardController, WishListController
+  ],
   providers: [
     OpenAiService,
     GenerateRecommendationsUseCase,
@@ -122,6 +131,14 @@ import { SendWelcomeEmailUseCase } from './application/use-cases/send-welcome-em
       useClass: TmdbRepositoryImpl,
     },
     SendWelcomeEmailUseCase,
+    GetWishListUseCase,
+    AddToWishListUseCase,
+    RemoveFromWishListUseCase,
+    {
+      provide: WISHLIST_REPOSITORY,
+      useClass: WishListRepositoryImpl,
+    },
+
   ],
   exports: [SendWelcomeEmailUseCase],
 })

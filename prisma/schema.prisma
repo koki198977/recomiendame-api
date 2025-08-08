@@ -8,8 +8,8 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
+  id             String    @id @default(cuid())
+  email          String    @unique
   password       String
   fullName       String
   birthDate      DateTime?
@@ -18,8 +18,8 @@ model User {
   language       String?
   favoriteGenres String[]
   favoriteMedia  String?
-  emailVerified  Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  emailVerified  Boolean   @default(false)
+  createdAt      DateTime  @default(now())
 
   seenItems              SeenItem[]
   ratings                Rating[]
@@ -28,6 +28,7 @@ model User {
   emailVerificationToken EmailVerificationToken?
   passwordResetTokens    PasswordResetToken[]
   ActivityLog            ActivityLog[]
+  wishListItems          WishListItem[]
 }
 
 model EmailVerificationToken {
@@ -50,7 +51,7 @@ model PasswordResetToken {
 }
 
 model Tmdb {
-  id          Int      @id // tmdbId como clave primaria
+  id          Int       @id // tmdbId como clave primaria
   title       String
   overview    String?
   posterUrl   String?
@@ -58,16 +59,17 @@ model Tmdb {
   genreIds    Int[]
   popularity  Float?
   voteAverage Float?
-  mediaType   String   // 'movie' | 'tv'
+  mediaType   String // 'movie' | 'tv'
   trailerUrl  String?
   platforms   Json? // Ej: ['Netflix', 'Disney+', 'HBO Max']
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
-  seenItems        SeenItem[]
-  ratings          Rating[]
-  favorites        Favorite[]
-  recommendations  Recommendation[]
-  activityLogs     ActivityLog[]
+  seenItems       SeenItem[]
+  ratings         Rating[]
+  favorites       Favorite[]
+  recommendations Recommendation[]
+  activityLogs    ActivityLog[]
+  wishListItems   WishListItem[]
 }
 
 model SeenItem {
@@ -76,7 +78,7 @@ model SeenItem {
   tmdbId    Int
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
@@ -90,7 +92,7 @@ model Rating {
   comment   String?
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
@@ -102,7 +104,7 @@ model Favorite {
   tmdbId    Int
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
@@ -115,7 +117,7 @@ model Recommendation {
   reason    String
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
@@ -129,6 +131,18 @@ model ActivityLog {
   details   String?
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tmdb Tmdb @relation(fields: [tmdbId], references: [id])
+}
+
+model WishListItem {
+  id        String   @id @default(cuid())
+  userId    String
+  tmdbId    Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
+
+  @@unique([userId, tmdbId])
 }
