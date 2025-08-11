@@ -8,4 +8,5 @@ export interface UserDataRepository {
   getSeenItems(userId: string): Promise<SeenItem[]>;
   getFavorites(userId: string): Promise<Favorite[]>;
   getRatings(userId: string): Promise<Rating[]>;
+  getWishlist(userId: string): Promise<Array<{ tmdbId: number; tmdb?: { title?: string } }>>;
 }

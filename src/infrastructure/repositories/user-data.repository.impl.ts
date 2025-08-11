@@ -5,6 +5,8 @@ import { Favorite } from 'src/domain/entities/favorite';
 import { Rating } from 'src/domain/entities/rating';
 import { PrismaService } from '../prisma/prisma.service';
 import { Tmdb } from 'src/domain/entities/tmdb';
+import { WishListItem } from 'src/domain/entities/wishlist-item';
+
 
 @Injectable()
 export class UserDataRepositoryImpl implements UserDataRepository {
@@ -104,6 +106,40 @@ export class UserDataRepositoryImpl implements UserDataRepository {
         i.tmdbId,
         i.rating,
         i.comment ?? null,
+        i.createdAt,
+        tmdb,
+      );
+    });
+  }
+
+  async getWishlist(userId: string): Promise<WishListItem[]> {
+    const items = await this.prisma.wishListItem.findMany({
+      where: { userId },
+      include: { tmdb: true },
+    });
+
+    return items.map(i => {
+      const tmdb = i.tmdb
+        ? new Tmdb(
+            i.tmdb.id,
+            i.tmdb.title,
+            i.tmdb.createdAt,
+            i.tmdb.posterUrl ?? undefined,
+            i.tmdb.overview ?? undefined,
+            i.tmdb.releaseDate,
+            i.tmdb.genreIds ?? [],
+            i.tmdb.popularity ?? undefined,
+            i.tmdb.voteAverage ?? undefined,
+            i.tmdb.mediaType as 'movie' | 'tv',
+            i.tmdb.platforms,
+            i.tmdb.trailerUrl ?? undefined,
+          )
+        : undefined;
+
+      return new WishListItem(
+        i.id,
+        i.userId,
+        i.tmdbId,
         i.createdAt,
         tmdb,
       );

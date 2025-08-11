@@ -41,7 +41,8 @@ export class GenerateRecommendationsUseCase {
       ratings,
       recentRecs,
       allRecs,
-      user
+      user,
+      wishlist
     ] = await Promise.all([
       this.userDataRepo.getSeenItems(userId),
       this.userDataRepo.getFavorites(userId),
@@ -49,6 +50,7 @@ export class GenerateRecommendationsUseCase {
       this.recommendationRepo.findLatestByUser(userId, 10),
       this.recommendationRepo.findAllByUser(userId),
       this.userRepo.findById(userId),
+      this.userDataRepo.getWishlist(userId),
     ]);
 
     const favoriteGenres    = user?.favoriteGenres || [];
@@ -64,6 +66,7 @@ export class GenerateRecommendationsUseCase {
     const last5 = <T>(arr: T[]) => arr.slice(-5);
     const seen5 = last5(seenItems.map(i => i.tmdb?.title).filter(Boolean) as string[]);
     const fav5  = last5(favorites.map(f => f.tmdb?.title).filter(Boolean) as string[]);
+    const wish5 = last5(wishlist.map(w => w.tmdb?.title).filter(Boolean) as string[]);
     const ratings5 = last5(
       ratings
         .map(r => `${r.tmdb?.title} (${r.rating}/5)`)
@@ -77,7 +80,7 @@ export class GenerateRecommendationsUseCase {
       sections.push(
         'Eres un recomendador personalizado de películas y series. A partir del siguiente texto del usuario, genera 5 títulos relevantes sin repetir anteriores.'
       );
-      sections.push(`🧠 Feedback del usuario: ${feedback}`);
+      sections.push(`Feedback del usuario: ${feedback}`);
     } else {
       sections.push(
         'Eres un recomendador de películas y series. Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.'
@@ -90,24 +93,25 @@ export class GenerateRecommendationsUseCase {
     }
 
     if (recentRecs.length === 0 && favoriteMediaText) {
-      sections.push(`📝 Sobre sus gustos: ${favoriteMediaText}`);
+      sections.push(`Sobre sus gustos: ${favoriteMediaText}`);
     }
 
-    if (seen5.length)    sections.push(`🎬 Vistos (últ. 5): ${seen5.join(', ')}`);
-    if (fav5.length)     sections.push(`⭐ Favoritas (últ. 5): ${fav5.join(', ')}`);
-    if (ratings5.length) sections.push(`📝 Puntuaciones (últ. 5): ${ratings5.join(', ')}`);
+    if (seen5.length)    sections.push(`Vistos (últ. 5): ${seen5.join(', ')}`);
+    if (fav5.length)     sections.push(`Favoritas (últ. 5): ${fav5.join(', ')}`);
+    if (wish5.length)    sections.push(`Deseados (últ. 5): ${wish5.join(', ')}`);
+    if (ratings5.length) sections.push(`Puntuaciones (últ. 5): ${ratings5.join(', ')}`);
     if (recentRecs.length) {
       const prev5 = last5(
         recentRecs.map(r => r.tmdb?.title.toLowerCase()).filter(Boolean) as string[]
       );
-      sections.push(`❌ Ya recomendadas (últ. 5): ${prev5.join(', ')}`);
+      sections.push(`Ya recomendadas (últ. 5): ${prev5.join(', ')}`);
     }
 
     sections.push(
-      '⚠️ Si no puedes generar exactamente 5 títulos nuevos (que no estén en tu historial ni en recomendaciones previas), completa la lista con las películas o series más populares según la crítica.'
+      'Si no puedes generar exactamente 5 títulos nuevos (que no estén en tu historial ni en recomendaciones previas), completa la lista con las películas o series más populares según la crítica.'
     );
     sections.push(
-      '⚠️ Responde únicamente con los nombres de las películas o series, uno por línea, sin numeración ni descripciones.'
+      'Responde únicamente con los nombres de las películas o series, uno por línea, sin numeración ni descripciones.'
     );
 
     const prompt = sections.join('\n');
