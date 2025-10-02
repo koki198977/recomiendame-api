@@ -29,6 +29,7 @@ model User {
   passwordResetTokens    PasswordResetToken[]
   ActivityLog            ActivityLog[]
   wishListItems          WishListItem[]
+  DeleteAccountToken     DeleteAccountToken[]
 }
 
 model EmailVerificationToken {
@@ -145,4 +146,13 @@ model WishListItem {
   tmdb Tmdb @relation(fields: [tmdbId], references: [id])
 
   @@unique([userId, tmdbId])
+}
+
+model DeleteAccountToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
 }

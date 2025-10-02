@@ -4,7 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RequestPasswordResetUseCase } from 'src/application/use-cases/request-password-reset.use-case';
 import { ResetPasswordUseCase } from 'src/application/use-cases/reset-password.use-case';
-
+import { RequestDeleteAccountUseCase } from 'src/application/use-cases/request-delete-account.use-case';
+import { DeleteAccountUseCase } from 'src/application/use-cases/delete-account.use-case';
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -12,6 +13,8 @@ export class AuthController {
     private readonly prisma: PrismaService,
     private readonly requestPasswordResetUseCase: RequestPasswordResetUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
+    private readonly requestDeleteAccountUseCase: RequestDeleteAccountUseCase,
+    private readonly deleteAccountUseCase: DeleteAccountUseCase,
   ) {}
 
   @Post('login')
@@ -57,5 +60,17 @@ export class AuthController {
   async resetPassword(@Body() body: { token: string; newPassword: string }) {
     await this.resetPasswordUseCase.execute(body.token, body.newPassword);
     return { message: 'Contraseña actualizada correctamente' };
+  }
+
+  @Post('request-delete-account')
+  async requestDeleteAccount(@Body() body: { email: string }) {
+    await this.requestDeleteAccountUseCase.execute(body.email);
+    return { message: 'Si el email existe, se ha enviado un enlace para eliminar la cuenta' };
+  }
+
+  @Post('delete-account')
+  async deleteAccount(@Body() body: { token: string }) {
+    await this.deleteAccountUseCase.execute(body.token);
+    return { message: 'Cuenta eliminada correctamente' };
   }
 }

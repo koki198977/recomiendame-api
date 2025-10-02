@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Confirmar eliminación de cuenta | Recomiéndame</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body style="margin:0;padding:0;background-color:#000;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+               style="margin:20px auto;padding:20px;background-color:#111;border-radius:8px;">
+          
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <img src="{{logoUrl}}" alt="Recomiéndame Logo" width="150" style="display:block;" />
+            </td>
+          </tr>
+
+          <!-- Título -->
+          <tr>
+            <td style="color:#fff;font-family:Arial,sans-serif;text-align:center;padding-bottom:10px;">
+              <h1 style="margin:0;font-size:24px;font-weight:bold;color:#a855f7;">
+                Confirmar eliminación de cuenta
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Texto principal -->
+          <tr>
+            <td style="color:#ccc;font-family:Arial,sans-serif;font-size:16px;line-height:1.5;text-align:center;padding:0 20px 16px;">
+              Hola {{fullName}},<br/>
+              estás solicitando <strong style="color:#fff;">eliminar tu cuenta</strong> y todos tus datos asociados en Recomiéndame.
+              Esta acción es <strong style="color:#fff;">irreversible</strong>.
+            </td>
+          </tr>
+
+          <!-- Aviso/Badge -->
+          <tr>
+            <td align="center" style="padding:0 20px 20px;">
+              <span style="display:inline-block;background:#1b1b1b;border:1px solid #2a2a2a;color:#bdbdbd;font-family:Arial,sans-serif;font-size:12px;padding:6px 10px;border-radius:999px;">
+                Seguridad: validaremos tu identidad antes de continuar
+              </span>
+            </td>
+          </tr>
+
+          <!-- Botón -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <a href="{{deleteUrl}}"
+                 style="
+                   background-color:#a855f7;
+                   color:#fff;
+                   text-decoration:none;
+                   padding:12px 24px;
+                   border-radius:8px;
+                   font-family:Arial,sans-serif;
+                   display:inline-block;
+                   font-size:16px;
+                   font-weight:bold;
+                 ">
+                Confirmar eliminación
+              </a>
+            </td>
+          </tr>
+
+          <!-- Expiración -->
+          <tr>
+            <td style="color:#666;font-family:Arial,sans-serif;font-size:14px;text-align:center;padding:0 20px 16px;">
+              Este enlace expirará en {{expiresInMinutes}} minutos.
+            </td>
+          </tr>
+
+          <!-- Fallback de enlace -->
+          <tr>
+            <td style="color:#666;font-family:Arial,sans-serif;font-size:12px;line-height:1.5;text-align:center;padding:0 24px 20px;">
+              Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>
+              <span style="word-break:break-all;color:#9ca3af;">{{deleteUrl}}</span>
+            </td>
+          </tr>
+
+          <!-- Pie -->
+          <tr>
+            <td style="color:#666;font-family:Arial,sans-serif;font-size:12px;text-align:center;">
+              Si no solicitaste esto, ignora este correo.<br/>
+              © Recomiéndame
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

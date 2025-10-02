@@ -10,4 +10,5 @@ export interface UserRepository {
   update(id: string, data: Partial<User>): Promise<User>;
   delete(id: string): Promise<void>;
   updatePassword(userId: string, hashedPassword: string): Promise<void>;
+  deleteUserAndCleanup(userId: string): Promise<void>;
 }

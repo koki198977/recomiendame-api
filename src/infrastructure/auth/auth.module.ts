@@ -14,6 +14,10 @@ import { USER_REPOSITORY } from 'src/application/ports/user.repository';
 import { UserRepositoryImpl } from '../repositories/user.repository.impl';
 import { ResetPasswordUseCase } from 'src/application/use-cases/reset-password.use-case';
 import { EmailModule } from '../email/email.module';
+import { RequestDeleteAccountUseCase } from 'src/application/use-cases/request-delete-account.use-case';
+import { DELETE_ACCOUNT_TOKEN_REPOSITORY } from 'src/application/ports/delete-account-token.repository';
+import { DeleteAccountTokenRepositoryImpl } from '../repositories/delete-account-token.repository';
+import { DeleteAccountUseCase } from 'src/application/use-cases/delete-account.use-case';
 
 @Module({
   imports: [
@@ -34,7 +38,10 @@ import { EmailModule } from '../email/email.module';
     JwtStrategy,
     RequestPasswordResetUseCase,
     ResetPasswordUseCase,
+    RequestDeleteAccountUseCase,
+    DeleteAccountUseCase,
     { provide: PASSWORD_RESET_TOKEN_REPOSITORY, useClass: PasswordResetTokenRepositoryImpl },
+    { provide: DELETE_ACCOUNT_TOKEN_REPOSITORY, useClass: DeleteAccountTokenRepositoryImpl },
     { provide: MAIL_SERVICE, useClass: ConsoleMailService },
     { provide: USER_REPOSITORY, useClass: UserRepositoryImpl },
   ],

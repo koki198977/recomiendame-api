@@ -197,4 +197,8 @@ export class UserRepositoryImpl implements UserRepository {
       user.favoriteGenres ?? [],
       user.favoriteMedia ?? undefined,
     );
+
+    async deleteUserAndCleanup(userId: string): Promise<void> {
+      await this.prisma.user.delete({ where: { id: userId } });
+    }
 }
