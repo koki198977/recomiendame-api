@@ -20,8 +20,10 @@ async function bootstrap() {
       transform: true, // transforma payloads a clases
     }),
   );
+  const isProd = process.env.NODE_ENV === 'production';
   app.use('/static', express.static(join(__dirname, '..', 'public')));
-  app.enableCors({
+  if(!isProd){
+    app.enableCors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
@@ -36,6 +38,7 @@ async function bootstrap() {
     credentials: true,
     maxAge: 86400,
   });
+}
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
