@@ -33,7 +33,7 @@ async function bootstrap() {
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    credentials: false,
+    credentials: true,
     maxAge: 86400,
   });
   await app.listen(process.env.PORT ?? 3000);
