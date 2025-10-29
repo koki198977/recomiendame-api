@@ -6,6 +6,13 @@ import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const envOrigins = (process.env.FRONTEND_URL ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  const allowedOrigins =
+    envOrigins.length > 0 ? envOrigins : ['http://localhost:8080'];
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // elimina propiedades no permitidas
@@ -15,9 +22,17 @@ async function bootstrap() {
   );
   app.use('/static', express.static(join(__dirname, '..', 'public')));
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(
+        new Error(`Origin ${origin} is not allowed by CORS policy.`),
+        false,
+      );
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: false,
     maxAge: 86400,
   });
