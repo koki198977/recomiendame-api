@@ -32,7 +32,7 @@ export class RequestDeleteAccountUseCase {
 
     const apiUrl   = this.config.get<string>('API_URL');
     const frontUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:8080');
-    const deleteUrl = `${frontUrl}/delete-account/confirm?token=${token}`;
+    const deleteUrl = `${frontUrl}/delete-account/?token=${token}`;
     const logoUrl = `${apiUrl}/static/assets/logo.png`;
 
     await this.emailService.sendMail(
