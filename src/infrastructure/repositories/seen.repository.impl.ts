@@ -47,7 +47,7 @@ export class PgSeenRepository implements SeenRepository {
             tmdb: {
               ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
               ...(mediaType ? { mediaType } : {}),
-              ...(platform ? { platforms: { has: platform } } : {}),
+              ...(platform ? { platforms: { array_contains: platform } } : {}),
             },
           }
         : {}),
@@ -131,14 +131,32 @@ export class PgSeenRepository implements SeenRepository {
       }),
     ]);
 
-    const items = records.map(
-      (i) =>
-        new SeenItem(
-          i.userId,
-          i.tmdbId,
-          i.createdAt,
-        ),
-    );
+    const items = records.map((record) => {
+      const tmdb = record.tmdb
+        ? new Tmdb(
+            record.tmdb.id,
+            record.tmdb.title,
+            record.tmdb.createdAt,
+            record.tmdb.posterUrl ?? undefined,
+            record.tmdb.overview ?? undefined,
+            record.tmdb.releaseDate ?? undefined,
+            record.tmdb.genreIds ?? [],
+            record.tmdb.popularity ?? 0,
+            record.tmdb.voteAverage ?? 0,
+            record.tmdb.mediaType as 'movie' | 'tv',
+            record.tmdb.platforms ?? [],
+            record.tmdb.trailerUrl ?? undefined,
+          )
+        : undefined;
+
+      return new SeenItem(
+        record.userId,
+        record.tmdbId,
+        record.createdAt,
+        record.createdAt,
+        tmdb,
+      );
+    });
 
     const page = Math.floor(skip / take) + 1;
     const totalPages = Math.ceil(total / take);
