@@ -52,6 +52,7 @@ import { RecommendationRepositoryImpl } from './infrastructure/repositories/reco
 import { TMDB_REPOSITORY } from './application/ports/tmdb.repository';
 import { TmdbRepositoryImpl } from './infrastructure/repositories/tmdb.repository.impl';
 import { GetRecommendationsUseCase } from './application/use-cases/get-recommendations.use-case';
+import { GetRecommendationHistoryUseCase } from './application/use-cases/get-recommendation-history.use-case';
 import { RemoveSeenUseCase } from './application/use-cases/remove-seen.use-case';
 import { RemoveRatingUseCase } from './application/use-cases/remove-rating.use-case';
 import { EmailModule } from './infrastructure/email/email.module';
@@ -80,6 +81,7 @@ import { WishListRepositoryImpl } from './infrastructure/repositories/wishlist.r
     OpenAiService,
     GenerateRecommendationsUseCase,
     GetRecommendationsUseCase,
+    GetRecommendationHistoryUseCase,
     {
       provide: USER_DATA_REPOSITORY,
       useClass: UserDataRepositoryImpl,
