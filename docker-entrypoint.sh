@@ -13,4 +13,4 @@ npx prisma generate
 npx prisma migrate deploy
 
 echo "🚀 Iniciando la aplicación..."
-exec node dist/main.js
+exec node dist/src/main.js
