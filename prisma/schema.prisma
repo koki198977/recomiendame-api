@@ -19,6 +19,7 @@ model User {
   favoriteGenres String[]
   favoriteMedia  String?
   emailVerified  Boolean   @default(false)
+  admin          Boolean   @default(false)
   createdAt      DateTime  @default(now())
 
   seenItems              SeenItem[]

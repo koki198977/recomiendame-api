@@ -10,6 +10,7 @@ import { User } from 'src/domain/entities/user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt.strategy';
+import { AdminGuard } from '../auth/admin.guard';
 import { SendWelcomeEmailUseCase } from 'src/application/use-cases/send-welcome-email.use-case';
 
 @Controller('users')
@@ -36,6 +37,7 @@ export class UserController {
     return { status };
   }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @Get()
   async findAll(): Promise<User[]> {
     return this.listUsersUseCase.execute();

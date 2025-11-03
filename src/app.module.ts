@@ -63,6 +63,7 @@ import { AddToWishListUseCase } from './application/use-cases/add-to-wishlist.us
 import { RemoveFromWishListUseCase } from './application/use-cases/remove-from-wishlist.use-case';
 import { WISHLIST_REPOSITORY } from './application/ports/wishlist.repository';
 import { WishListRepositoryImpl } from './infrastructure/repositories/wishlist.repository';
+import { AdminGuard } from './infrastructure/auth/admin.guard';
 
 @Module({
   imports: [
@@ -140,6 +141,7 @@ import { WishListRepositoryImpl } from './infrastructure/repositories/wishlist.r
       provide: WISHLIST_REPOSITORY,
       useClass: WishListRepositoryImpl,
     },
+    AdminGuard,
 
   ],
   exports: [SendWelcomeEmailUseCase],
