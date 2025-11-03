@@ -44,7 +44,7 @@ export class AuthController {
 
     const payload = { sub: user.id, email: user.email };
     const access_token = this.jwtService.sign(payload);
-    return { access_token };
+    return { access_token, admin: user.admin };
   }
 
   @Post('request-password-reset')
