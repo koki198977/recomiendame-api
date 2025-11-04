@@ -19,21 +19,43 @@ export class ActivityLogRepositoryImpl implements ActivityLogRepository {
     });
   }
 
-  async getUserActivity(userId: string): Promise<ActivityLog[]> {
-    const logs = await this.prisma.activityLog.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+  async getUserActivity(
+    userId: string,
+    options: { skip: number; take: number },
+  ): Promise<{ data: ActivityLog[]; total: number }> {
+    const [logs, total] = await Promise.all([
+      this.prisma.activityLog.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip: options.skip,
+        take: options.take,
+      }),
+      this.prisma.activityLog.count({ where: { userId } }),
+    ]);
 
-    return logs.map((log) => this.mapToDomain(log));
+    return {
+      data: logs.map((log) => this.mapToDomain(log)),
+      total,
+    };
   }
 
-  async getAll(): Promise<ActivityLog[]> {
-    const logs = await this.prisma.activityLog.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async getAll(options: {
+    skip: number;
+    take: number;
+  }): Promise<{ data: ActivityLog[]; total: number }> {
+    const [logs, total] = await Promise.all([
+      this.prisma.activityLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: options.skip,
+        take: options.take,
+      }),
+      this.prisma.activityLog.count(),
+    ]);
 
-    return logs.map((log) => this.mapToDomain(log));
+    return {
+      data: logs.map((log) => this.mapToDomain(log)),
+      total,
+    };
   }
 
   private mapToDomain(log: {

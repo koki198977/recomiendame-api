@@ -9,7 +9,20 @@ export class GetAllActivityLogUseCase {
     private readonly activityRepo: ActivityLogRepository,
   ) {}
 
-  async execute(): Promise<ActivityLog[]> {
-    return this.activityRepo.getAll();
+  async execute(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: ActivityLog[]; meta: { page: number; limit: number; total: number; totalPages: number } }> {
+    const page = Math.max(1, params?.page ?? 1);
+    const limit = Math.min(Math.max(1, params?.limit ?? 50), 100);
+    const skip = (page - 1) * limit;
+
+    const { data, total } = await this.activityRepo.getAll({ skip, take: limit });
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages },
+    };
   }
 }

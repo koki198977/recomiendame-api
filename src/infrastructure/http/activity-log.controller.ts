@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.strategy';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { GetActivityLogUseCase } from 'src/application/use-cases/get-activity-log.use-case';
@@ -14,15 +14,40 @@ export class ActivityLogController {
   ) {}
 
   @Get()
-  async getUserActivity(@CurrentUser() user: { sub: string }) {
-    const logs = await this.getActivity.execute(user.sub);
-    return { logs };
+  async getUserActivity(
+    @CurrentUser() user: { sub: string },
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNumber = this.parseNumber(page);
+    const limitNumber = this.parseNumber(limit);
+    const result = await this.getActivity.execute(user.sub, {
+      page: pageNumber,
+      limit: limitNumber,
+    });
+    return { logs: result.data, meta: result.meta };
   }
 
   @Get('admin')
   @UseGuards(AdminGuard)
-  async getAllActivityLogs() {
-    const logs = await this.getAllActivity.execute();
-    return { logs };
+  async getAllActivityLogs(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNumber = this.parseNumber(page);
+    const limitNumber = this.parseNumber(limit);
+    const result = await this.getAllActivity.execute({
+      page: pageNumber,
+      limit: limitNumber,
+    });
+    return { logs: result.data, meta: result.meta };
+  }
+
+  private parseNumber(value?: string): number | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 }
