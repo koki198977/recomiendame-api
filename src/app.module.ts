@@ -43,6 +43,7 @@ import { USER_DATA_REPOSITORY } from './application/ports/user-data.repository';
 import { UserDataRepositoryImpl } from './infrastructure/repositories/user-data.repository.impl';
 import { ActivityLogController } from './infrastructure/http/activity-log.controller';
 import { GetActivityLogUseCase } from './application/use-cases/get-activity-log.use-case';
+import { GetAllActivityLogUseCase } from './application/use-cases/get-all-activity-log.use-case';
 import { ACTIVITY_LOG_REPOSITORY } from './application/ports/activity-log.repository';
 import { ActivityLogRepositoryImpl } from './infrastructure/repositories/activity-log.repository.impl';
 import { DashboardController } from './infrastructure/http/dashboard.controller';
@@ -120,6 +121,7 @@ import { AdminGuard } from './infrastructure/auth/admin.guard';
       useClass: RatingRepositoryImpl,
     },
     GetActivityLogUseCase,
+    GetAllActivityLogUseCase,
     {
       provide: ACTIVITY_LOG_REPOSITORY,
       useClass: ActivityLogRepositoryImpl,

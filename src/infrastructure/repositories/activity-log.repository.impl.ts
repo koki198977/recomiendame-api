@@ -25,16 +25,32 @@ export class ActivityLogRepositoryImpl implements ActivityLogRepository {
       orderBy: { createdAt: 'desc' },
     });
 
-    return logs.map(
-      (log) =>
-        new ActivityLog(
-          log.id,
-          log.userId,
-          log.action,
-          log.tmdbId,
-          log.details ?? undefined,
-          log.createdAt,
-        ),
+    return logs.map((log) => this.mapToDomain(log));
+  }
+
+  async getAll(): Promise<ActivityLog[]> {
+    const logs = await this.prisma.activityLog.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return logs.map((log) => this.mapToDomain(log));
+  }
+
+  private mapToDomain(log: {
+    id: string;
+    userId: string;
+    action: string;
+    tmdbId: number;
+    details: string | null;
+    createdAt: Date;
+  }): ActivityLog {
+    return new ActivityLog(
+      log.id,
+      log.userId,
+      log.action,
+      log.tmdbId,
+      log.details ?? undefined,
+      log.createdAt,
     );
   }
 }
