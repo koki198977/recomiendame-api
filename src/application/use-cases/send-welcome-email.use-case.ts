@@ -18,7 +18,7 @@ export class SendWelcomeEmailUseCase {
     const apiUrl    = this.config.get<string>('API_URL');
     const frontUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:8080');
     const verifyUrl = `${frontUrl}/verify-email/?token=${token}`;
-    const logoUrl = `${apiUrl}/static/assets/logo.png`;
+    const logoUrl = 'https://recomiendameapp.cl/_nuxt/logo.B0ICmSKa.png';
 
     await this.emailService.sendMail(
       userEmail,
