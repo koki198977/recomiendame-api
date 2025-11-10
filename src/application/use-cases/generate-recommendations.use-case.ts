@@ -128,26 +128,44 @@ export class GenerateRecommendationsUseCase {
     if (candidates.length < 3 && !feedback && user.favoriteGenres && user.favoriteGenres.length > 0) {
       console.log('⚠️ Not enough candidates, searching by favorite genres...');
       
+      // Map genre names to better search terms
+      const genreSearchTerms: Record<string, string[]> = {
+        'Drama': ['drama series', 'dramatic film'],
+        'Thriller': ['thriller', 'suspense'],
+        'Acción': ['action', 'adventure'],
+        'Comedia': ['comedy', 'funny'],
+        'Terror': ['horror', 'scary'],
+        'Aventura': ['adventure', 'quest'],
+        'Ciencia Ficción': ['sci-fi', 'science fiction'],
+        'Romance': ['romance', 'love story'],
+      };
+      
       for (const genre of user.favoriteGenres.slice(0, 2)) {
-        const genreResults = await this.tmdbService.search(genre);
-        const genreTitles = genreResults
-          .slice(0, 5)
-          .filter(item => !allPrevIds.has(item.id))
-          .map(r => r.title);
+        const searchTerms = genreSearchTerms[genre] || [genre];
         
-        if (genreTitles.length > 0) {
-          const genreCandidates = await this.searchAndScoreCandidates(
-            genreTitles,
-            user,
-            favorites,
-            ratings,
-            allPrevIds
-          );
-          candidates.push(...genreCandidates);
-          console.log(`✅ Added ${genreCandidates.length} candidates from genre "${genre}"`);
+        for (const term of searchTerms) {
+          const genreResults = await this.tmdbService.search(term);
+          const genreTitles = genreResults
+            .slice(0, 5)
+            .filter(item => !allPrevIds.has(item.id))
+            .map(r => r.title);
+          
+          if (genreTitles.length > 0) {
+            const genreCandidates = await this.searchAndScoreCandidates(
+              genreTitles,
+              user,
+              favorites,
+              ratings,
+              allPrevIds
+            );
+            candidates.push(...genreCandidates);
+            console.log(`✅ Added ${genreCandidates.length} candidates from genre search "${term}"`);
+          }
+          
+          if (candidates.length >= 8) break;
         }
         
-        if (candidates.length >= 5) break;
+        if (candidates.length >= 8) break;
       }
     }
 
@@ -206,10 +224,14 @@ export class GenerateRecommendationsUseCase {
       console.log(`✅ Total candidates after emergency trending: ${candidates.length}`);
     }
 
-    // 8) Select best 5 with diversity
-    const bestRecs = RecommendationScorer.diversify(candidates, 5);
+    // 8) Deduplicate candidates by tmdbId
+    const uniqueCandidates = this.deduplicateCandidates(candidates);
+    console.log(`🔄 Deduplicated: ${candidates.length} → ${uniqueCandidates.length} unique candidates`);
 
-    // 9) Ensure we have at least some recommendations
+    // 9) Select best 5 with diversity
+    const bestRecs = RecommendationScorer.diversify(uniqueCandidates, 5);
+
+    // 10) Ensure we have at least some recommendations
     if (bestRecs.length === 0) {
       console.error('❌ CRITICAL: No recommendations could be generated!');
       throw new Error('No se pudieron generar recomendaciones. Por favor, intenta de nuevo.');
@@ -217,7 +239,7 @@ export class GenerateRecommendationsUseCase {
 
     console.log(`🎯 Final selection: ${bestRecs.length} recommendations`);
 
-    // 10) Save and return
+    // 11) Save and return
     const results = await this.saveRecommendations(
       bestRecs,
       userId,
@@ -225,6 +247,21 @@ export class GenerateRecommendationsUseCase {
     );
 
     return this.mapToResponse(results);
+  }
+
+  private deduplicateCandidates(candidates: any[]): any[] {
+    const seen = new Map<number, any>();
+    
+    for (const candidate of candidates) {
+      const id = candidate.item.id;
+      
+      // Keep the one with higher score
+      if (!seen.has(id) || seen.get(id).score < candidate.score) {
+        seen.set(id, candidate);
+      }
+    }
+    
+    return Array.from(seen.values());
   }
 
   private async searchAndScoreCandidates(
@@ -235,6 +272,7 @@ export class GenerateRecommendationsUseCase {
     excludeIds: Set<number>
   ) {
     const candidates: any[] = [];
+    const seenIds = new Set<number>(); // Track IDs we've already added
     const avgRating = ratings.length > 0
       ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
       : 3.5;
@@ -268,6 +306,11 @@ export class GenerateRecommendationsUseCase {
           continue;
         }
 
+        if (seenIds.has(first.id)) {
+          console.log(`  ⏭️  Skipping (duplicate in this batch): ${first.title}`);
+          continue;
+        }
+
         const scored = RecommendationScorer.score(first, {
           userFavoriteGenres: user.favoriteGenres || [],
           userAvgRating: avgRating,
@@ -278,6 +321,7 @@ export class GenerateRecommendationsUseCase {
 
         console.log(`  📊 Score: ${scored.score} - ${scored.reasons.join(', ')}`);
         candidates.push(scored);
+        seenIds.add(first.id); // Mark as seen
       } catch (error) {
         console.error(`  ❌ Error searching "${title}":`, error.message);
       }
@@ -353,28 +397,39 @@ export class GenerateRecommendationsUseCase {
     excludeIds: Set<number>
   ): Promise<Array<{ entity: Recommendation; score: number }>> {
     const results: Array<{ entity: Recommendation; score: number }> = [];
+    const savedIds = new Set<number>(); // Track what we save in this batch
 
     for (const scored of scoredRecs) {
       const item = scored.item;
 
+      // Skip if already saved in this batch
+      if (savedIds.has(item.id)) {
+        console.log(`⏭️  Skipping duplicate in save batch: ${item.title} (ID: ${item.id})`);
+        continue;
+      }
+
       // Save to TMDB cache if new
       if (!excludeIds.has(item.id)) {
-        await this.tmdbRepository.save(
-          new Tmdb(
-            item.id,
-            item.title,
-            new Date(),
-            item.posterUrl ?? undefined,
-            item.overview ?? undefined,
-            item.releaseDate ? new Date(item.releaseDate) : undefined,
-            item.genreIds || [],
-            item.popularity || 0,
-            item.voteAverage || 0,
-            item.mediaType || 'movie',
-            item.platforms ?? [],
-            item.trailerUrl ?? undefined,
-          )
-        );
+        try {
+          await this.tmdbRepository.save(
+            new Tmdb(
+              item.id,
+              item.title,
+              new Date(),
+              item.posterUrl ?? undefined,
+              item.overview ?? undefined,
+              item.releaseDate ? new Date(item.releaseDate) : undefined,
+              item.genreIds || [],
+              item.popularity || 0,
+              item.voteAverage || 0,
+              item.mediaType || 'movie',
+              item.platforms ?? [],
+              item.trailerUrl ?? undefined,
+            )
+          );
+        } catch (error) {
+          console.log(`⚠️  TMDB cache save failed (may already exist): ${item.title}`);
+        }
       }
 
       // Create recommendation with intelligent reason
@@ -393,17 +448,27 @@ export class GenerateRecommendationsUseCase {
 
       // Save if new
       if (!excludeIds.has(item.id)) {
-        await this.recommendationRepo.save(recEntity);
-        await this.activityLogRepo.log(
-          new ActivityLog(
-            undefined,
-            userId,
-            'recommended',
-            item.id,
-            reason,
-            new Date(),
-          )
-        );
+        try {
+          await this.recommendationRepo.save(recEntity);
+          await this.activityLogRepo.log(
+            new ActivityLog(
+              undefined,
+              userId,
+              'recommended',
+              item.id,
+              reason,
+              new Date(),
+            )
+          );
+          savedIds.add(item.id);
+          console.log(`✅ Saved recommendation: ${item.title} (ID: ${item.id})`);
+        } catch (error) {
+          console.error(`❌ Failed to save recommendation ${item.title}:`, error.message);
+          // Skip this one but continue with others
+          continue;
+        }
+      } else {
+        console.log(`⏭️  Not saving (already recommended): ${item.title}`);
       }
 
       results.push({ entity: recEntity, score: scored.score });
