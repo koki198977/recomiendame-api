@@ -75,37 +75,13 @@ export class GenerateRecommendationsUseCase {
     const raw = await this.openAi.generate(prompt);
     console.log('📝 OpenAI raw response:', raw);
     
-    const aiTitles = this.parseRecommendations(raw);
+    let aiTitles = this.parseRecommendations(raw);
     console.log('✅ Parsed titles:', aiTitles);
 
     // 4) Search and score all candidates
     const allPrevIds = new Set(allRecs.map(r => r.tmdbId));
     
-    // If AI didn't return enough titles, try a more specific search based on feedback
-    if (aiTitles.length < 3 && feedback) {
-      console.log('⚠️ AI returned few titles, searching TMDB directly with feedback...');
-      
-      // Try searching with keywords from feedback
-      const keywords = this.extractKeywords(feedback);
-      console.log('🔑 Extracted keywords:', keywords);
-      
-      for (const keyword of keywords) {
-        const directSearchResults = await this.tmdbService.search(keyword);
-        const directTitles = directSearchResults
-          .slice(0, 3)
-          .map(r => r.title)
-          .filter(t => {
-            const item = directSearchResults.find(r => r.title === t);
-            return item && !allPrevIds.has(item.id);
-          });
-        aiTitles.push(...directTitles);
-        console.log(`🔍 Added ${directTitles.length} results for keyword "${keyword}":`, directTitles);
-        
-        if (aiTitles.length >= 8) break; // Enough candidates
-      }
-    }
-    
-    const candidates = await this.searchAndScoreCandidates(
+    let candidates = await this.searchAndScoreCandidates(
       aiTitles,
       user,
       favorites,
@@ -114,6 +90,66 @@ export class GenerateRecommendationsUseCase {
     );
 
     console.log(`📊 Found ${candidates.length} candidates after scoring`);
+
+    // If all AI recommendations were already recommended, try with feedback keywords
+    if (candidates.length === 0 && feedback) {
+      console.log('⚠️ All AI titles were duplicates, searching TMDB directly with feedback...');
+      
+      const keywords = this.extractKeywords(feedback);
+      console.log('🔑 Extracted keywords:', keywords);
+      
+      const directTitles: string[] = [];
+      for (const keyword of keywords) {
+        const directSearchResults = await this.tmdbService.search(keyword);
+        const newTitles = directSearchResults
+          .slice(0, 5)
+          .filter(item => !allPrevIds.has(item.id))
+          .map(r => r.title);
+        directTitles.push(...newTitles);
+        console.log(`🔍 Found ${newTitles.length} new results for keyword "${keyword}"`);
+        
+        if (directTitles.length >= 10) break;
+      }
+      
+      if (directTitles.length > 0) {
+        const directCandidates = await this.searchAndScoreCandidates(
+          directTitles,
+          user,
+          favorites,
+          ratings,
+          allPrevIds
+        );
+        candidates.push(...directCandidates);
+        console.log(`✅ Added ${directCandidates.length} candidates from direct search`);
+      }
+    }
+    
+    // If still not enough and no specific feedback, try genre-based search
+    if (candidates.length < 3 && !feedback && user.favoriteGenres && user.favoriteGenres.length > 0) {
+      console.log('⚠️ Not enough candidates, searching by favorite genres...');
+      
+      for (const genre of user.favoriteGenres.slice(0, 2)) {
+        const genreResults = await this.tmdbService.search(genre);
+        const genreTitles = genreResults
+          .slice(0, 5)
+          .filter(item => !allPrevIds.has(item.id))
+          .map(r => r.title);
+        
+        if (genreTitles.length > 0) {
+          const genreCandidates = await this.searchAndScoreCandidates(
+            genreTitles,
+            user,
+            favorites,
+            ratings,
+            allPrevIds
+          );
+          candidates.push(...genreCandidates);
+          console.log(`✅ Added ${genreCandidates.length} candidates from genre "${genre}"`);
+        }
+        
+        if (candidates.length >= 5) break;
+      }
+    }
 
     // 5) If not enough, add trending items
     if (candidates.length < 5) {
@@ -129,10 +165,59 @@ export class GenerateRecommendationsUseCase {
       console.log(`✅ Total candidates after trending: ${candidates.length}`);
     }
 
-    // 6) Select best 5 with diversity
+    // 6) Last resort: if still not enough, allow re-recommendations from older ones
+    if (candidates.length < 5) {
+      console.log(`⚠️ Still only ${candidates.length} candidates, allowing re-recommendations from older items...`);
+      
+      // Get older recommendations (not in recent 10)
+      const olderRecs = allRecs
+        .filter(r => !recentRecs.some(recent => recent.tmdbId === r.tmdbId))
+        .slice(-20); // Last 20 older recommendations
+      
+      if (olderRecs.length > 0) {
+        const olderTitles = olderRecs
+          .map(r => r.tmdb?.title)
+          .filter(Boolean) as string[];
+        
+        const olderCandidates = await this.searchAndScoreCandidates(
+          olderTitles.slice(0, 10),
+          user,
+          favorites,
+          ratings,
+          new Set() // Don't exclude anything this time
+        );
+        
+        candidates.push(...olderCandidates);
+        console.log(`✅ Added ${olderCandidates.length} candidates from older recommendations`);
+      }
+    }
+
+    // 7) If STILL not enough, just use trending without exclusions
+    if (candidates.length < 5) {
+      console.log(`⚠️ CRITICAL: Only ${candidates.length} candidates, using trending without exclusions...`);
+      const emergencyTrending = await this.addTrendingCandidates(
+        5 - candidates.length,
+        user,
+        favorites,
+        ratings,
+        new Set() // No exclusions
+      );
+      candidates.push(...emergencyTrending);
+      console.log(`✅ Total candidates after emergency trending: ${candidates.length}`);
+    }
+
+    // 8) Select best 5 with diversity
     const bestRecs = RecommendationScorer.diversify(candidates, 5);
 
-    // 7) Save and return
+    // 9) Ensure we have at least some recommendations
+    if (bestRecs.length === 0) {
+      console.error('❌ CRITICAL: No recommendations could be generated!');
+      throw new Error('No se pudieron generar recomendaciones. Por favor, intenta de nuevo.');
+    }
+
+    console.log(`🎯 Final selection: ${bestRecs.length} recommendations`);
+
+    // 10) Save and return
     const results = await this.saveRecommendations(
       bestRecs,
       userId,
@@ -209,32 +294,56 @@ export class GenerateRecommendationsUseCase {
     ratings: any[],
     excludeIds: Set<number>
   ) {
-    const trending = await this.tmdbService.getTrending(count * 2);
+    console.log(`🔥 Fetching trending items (need ${count})...`);
+    const trending = await this.tmdbService.getTrending(count * 3); // Fetch more to account for duplicates
     const candidates: any[] = [];
 
     const avgRating = ratings.length > 0
       ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
       : 3.5;
 
+    console.log(`📺 Got ${trending.length} trending items from TMDB`);
+
     for (const trendingItem of trending) {
-      if (excludeIds.has(trendingItem.id)) continue;
+      if (candidates.length >= count) break; // Stop when we have enough
+
+      console.log(`  Checking trending: ${trendingItem.title} (ID: ${trendingItem.id})`);
+      
+      if (excludeIds.has(trendingItem.id)) {
+        console.log(`  ⏭️  Already recommended`);
+        continue;
+      }
 
       // Search to get full details
-      const results = await this.tmdbService.search(trendingItem.title);
-      const item = results[0];
-      
-      if (!item || excludeIds.has(item.id)) continue;
+      try {
+        const results = await this.tmdbService.search(trendingItem.title);
+        const item = results[0];
+        
+        if (!item) {
+          console.log(`  ❌ Not found in search`);
+          continue;
+        }
+        
+        if (excludeIds.has(item.id)) {
+          console.log(`  ⏭️  Already recommended (after search)`);
+          continue;
+        }
 
-      const scored = RecommendationScorer.score(item, {
-        userFavoriteGenres: user.favoriteGenres || [],
-        userAvgRating: avgRating,
-        userFavorites: favorites,
-        userRatings: ratings,
-      });
+        const scored = RecommendationScorer.score(item, {
+          userFavoriteGenres: user.favoriteGenres || [],
+          userAvgRating: avgRating,
+          userFavorites: favorites,
+          userRatings: ratings,
+        });
 
-      candidates.push(scored);
+        console.log(`  ✅ Added with score: ${scored.score}`);
+        candidates.push(scored);
+      } catch (error) {
+        console.error(`  ❌ Error processing trending item:`, error.message);
+      }
     }
 
+    console.log(`✅ Found ${candidates.length} trending candidates`);
     return RecommendationScorer.selectBest(candidates, count);
   }
 
