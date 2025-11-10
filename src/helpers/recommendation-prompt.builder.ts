@@ -68,11 +68,16 @@ export class RecommendationPromptBuilder {
 
     // User context
     if (this.feedback) {
-      sections.push('## SOLICITUD DEL USUARIO');
+      sections.push('## SOLICITUD ESPECÍFICA DEL USUARIO (MÁXIMA PRIORIDAD)');
       sections.push(this.feedback);
       sections.push('');
-      sections.push('IMPORTANTE: Interpreta la solicitud y recomienda títulos que coincidan con el tema o género solicitado.');
-      sections.push('Si menciona "informática", "tecnología", "hackers", etc., recomienda series/películas sobre programación, tecnología, startups, hackers, IA, etc.');
+      sections.push('⚠️ CRÍTICO: Esta solicitud es LO MÁS IMPORTANTE. TODAS las recomendaciones deben estar directamente relacionadas.');
+      sections.push('- Si pide "humor" o "comedia" → SOLO comedias');
+      sections.push('- Si pide "tipo Dark" → Series/películas con misterio, ciencia ficción, viajes en el tiempo');
+      sections.push('- Si pide "informática" → Contenido sobre tecnología, hackers, programación');
+      sections.push('- Si pide "terror" → SOLO contenido de terror/horror');
+      sections.push('');
+      sections.push('NO ignores esta solicitud. NO recomiendes contenido que no coincida con lo pedido.');
       sections.push('');
     }
 

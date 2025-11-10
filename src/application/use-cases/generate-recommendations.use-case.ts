@@ -201,61 +201,38 @@ export class GenerateRecommendationsUseCase {
       console.log(`✅ Total candidates after trending: ${candidates.length}`);
     }
 
-    // 6) Last resort: if still not enough, allow re-recommendations from older ones (50+ recommendations ago)
-    if (candidates.length < 3) {
-      console.log(`⚠️ Still only ${candidates.length} candidates, allowing re-recommendations from much older items...`);
-      
-      // Get much older recommendations (not in recent 50)
-      const recentCutoff = 50;
-      const veryOldRecs = allRecs.slice(0, -recentCutoff); // Everything except last 50
-      
-      if (veryOldRecs.length > 0) {
-        console.log(`📚 Found ${veryOldRecs.length} very old recommendations to consider`);
-        const olderTitles = veryOldRecs
-          .slice(-20) // Take last 20 of the old ones
-          .map(r => r.tmdb?.title)
-          .filter(Boolean) as string[];
-        
-        const olderCandidates = await this.searchAndScoreCandidates(
-          olderTitles,
-          user,
-          favorites,
-          ratings,
-          new Set() // Don't exclude anything this time
-        );
-        
-        candidates.push(...olderCandidates);
-        console.log(`✅ Added ${olderCandidates.length} candidates from very old recommendations`);
-      } else {
-        console.log(`⚠️ No old recommendations available (user has < ${recentCutoff} total recommendations)`);
-      }
-    }
+    // 6) Skip re-recommendations fallback - causes too many duplicates
+    // Users prefer new content over re-recommendations
 
-    // 7) If STILL not enough, just use trending without exclusions
-    if (candidates.length < 5) {
-      console.log(`⚠️ CRITICAL: Only ${candidates.length} candidates, using trending without exclusions...`);
+    // 7) Deduplicate candidates by tmdbId
+    const uniqueCandidates = this.deduplicateCandidates(candidates);
+    console.log(`🔄 Deduplicated: ${candidates.length} → ${uniqueCandidates.length} unique candidates`);
+
+    // 8) If STILL not enough after all fallbacks, use trending without exclusions
+    if (uniqueCandidates.length < 3) {
+      console.log(`⚠️ CRITICAL: Only ${uniqueCandidates.length} candidates, using trending without exclusions...`);
       const emergencyTrending = await this.addTrendingCandidates(
-        5 - candidates.length,
+        5 - uniqueCandidates.length,
         user,
         favorites,
         ratings,
         new Set() // No exclusions
       );
-      candidates.push(...emergencyTrending);
-      console.log(`✅ Total candidates after emergency trending: ${candidates.length}`);
+      uniqueCandidates.push(...emergencyTrending);
+      console.log(`✅ Total candidates after emergency trending: ${uniqueCandidates.length}`);
     }
 
-    // 8) Deduplicate candidates by tmdbId
-    const uniqueCandidates = this.deduplicateCandidates(candidates);
-    console.log(`🔄 Deduplicated: ${candidates.length} → ${uniqueCandidates.length} unique candidates`);
-
-    // 9) Select best 5 with diversity
+    // 9) Select best with diversity
     const bestRecs = RecommendationScorer.diversify(uniqueCandidates, 5);
 
     // 10) Ensure we have at least some recommendations
     if (bestRecs.length === 0) {
       console.error('❌ CRITICAL: No recommendations could be generated!');
-      throw new Error('No se pudieron generar recomendaciones. Por favor, intenta de nuevo.');
+      console.error('This usually means:');
+      console.error('- User has seen most available content');
+      console.error('- Feedback is too specific');
+      console.error('- TMDB API issues');
+      throw new Error('No se pudieron generar recomendaciones nuevas. Has visto mucho contenido! Intenta con un feedback más general o espera a que se agregue más contenido.');
     }
 
     console.log(`🎯 Final selection: ${bestRecs.length} recommendations`);
@@ -518,11 +495,6 @@ export class GenerateRecommendationsUseCase {
       } catch (error) {
         console.warn(`⚠️  Invalid release date for ${rd.title}:`, rd.releaseDate);
         release = undefined;
-      }
-
-      // Log trailer status for debugging
-      if (!rd.trailerUrl) {
-        console.log(`⚠️  No trailer available for: ${rd.title} (ID: ${rec.tmdbId})`);
       }
 
       return {

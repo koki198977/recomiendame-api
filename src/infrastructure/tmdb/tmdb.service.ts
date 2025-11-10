@@ -127,41 +127,45 @@ export class TmdbService {
     const url = `${this.baseUrl}/${type}/${id}/videos`;
 
     try {
-      // Try Spanish first
-      let { data } = await this.http.axiosRef.get(url, {
-        params: { api_key: this.apiKey, language: 'es-ES' },
+      // Get all videos without language filter to have more options
+      const { data } = await this.http.axiosRef.get(url, {
+        params: { api_key: this.apiKey },
       });
 
-      let trailer = data.results.find(
-        (v) => v.type === 'Trailer' && v.site === 'YouTube'
+      if (!data.results || data.results.length === 0) {
+        return undefined;
+      }
+
+      const videos = data.results.filter((v) => v.site === 'YouTube');
+
+      // Priority 1: Spanish (any variant - includes Latino)
+      let trailer = videos.find(
+        (v) => v.type === 'Trailer' && v.iso_639_1 === 'es'
       );
 
-      // If no Spanish trailer, try English
+      // Priority 2: English (for subtitles)
       if (!trailer) {
-        const response = await this.http.axiosRef.get(url, {
-          params: { api_key: this.apiKey, language: 'en-US' },
-        });
-        data = response.data;
-        trailer = data.results.find(
-          (v) => v.type === 'Trailer' && v.site === 'YouTube'
+        trailer = videos.find(
+          (v) => v.type === 'Trailer' && v.iso_639_1 === 'en'
         );
       }
 
-      // If still no trailer, try any language
-      if (!trailer && data.results.length > 0) {
-        trailer = data.results.find((v) => v.site === 'YouTube');
+      // Priority 3: Any trailer
+      if (!trailer) {
+        trailer = videos.find((v) => v.type === 'Trailer');
+      }
+
+      // Priority 4: Any video
+      if (!trailer && videos.length > 0) {
+        trailer = videos[0];
       }
 
       if (trailer) {
-        const trailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
-        console.log(`🎬 Trailer found for ${type} ${id}: ${trailerUrl}`);
-        return trailerUrl;
-      } else {
-        console.log(`⚠️  No trailer found for ${type} ${id}`);
-        return undefined;
+        return `https://www.youtube.com/watch?v=${trailer.key}`;
       }
+      
+      return undefined;
     } catch (error) {
-      console.error(`❌ Error al obtener trailer para ${type} ${id}:`, error.message);
       return undefined;
     }
   }
