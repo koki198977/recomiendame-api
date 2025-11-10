@@ -18,15 +18,17 @@ export class OpenAiService {
       messages: [
         {
           role: 'system',
-          content: 'Eres un recomendador experto de películas y series. Siempre respondes con exactamente 5 títulos, uno por línea, sin numeración ni descripciones.',
+          content: 'Eres un recomendador experto de películas y series. Siempre respondes con exactamente 5 títulos DIFERENTES y VARIADOS, uno por línea, sin numeración ni descripciones. Evita recomendar siempre los mismos títulos populares.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.8, // Un poco más de creatividad
-      max_tokens: 500, // Aumentado para permitir 5 títulos completos
+      temperature: 0.9, // Más creatividad para evitar repeticiones
+      max_tokens: 500,
+      presence_penalty: 0.6, // Penaliza repetir temas similares
+      frequency_penalty: 0.3, // Penaliza repetir palabras
     });
 
     const response = completion.choices[0].message.content?.trim() ?? '';

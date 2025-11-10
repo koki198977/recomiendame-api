@@ -210,25 +210,26 @@ export class RecommendationPromptBuilder {
   private buildConstraintsSection(): string {
     const constraints: string[] = [];
 
-    constraints.push('1. Genera EXACTAMENTE 5 recomendaciones');
+    constraints.push('1. Genera EXACTAMENTE 5 recomendaciones DIFERENTES');
     constraints.push('2. NO repitas títulos que el usuario ya haya visto, marcado como favorito o estén en su wishlist');
     
     if (this.recentRecs.length > 0) {
       const recentTitles = this.recentRecs
-        .slice(-10)
+        .slice(-20) // Aumentado de 10 a 20 para evitar más repeticiones
         .map(r => r.tmdb?.title)
         .filter(Boolean)
         .join(', ');
-      constraints.push(`3. NO repitas estas recomendaciones previas: ${recentTitles}`);
+      constraints.push(`3. CRÍTICO: NO repitas NINGUNA de estas recomendaciones previas: ${recentTitles}`);
     }
 
     constraints.push('4. Prioriza títulos de calidad reconocida (crítica o audiencia)');
     constraints.push('5. Balancea entre títulos populares y joyas ocultas');
     constraints.push('6. Considera tanto películas como series, a menos que el usuario tenga preferencia clara');
+    constraints.push('7. SÉ CREATIVO: Busca títulos menos obvios pero de alta calidad');
     
     if (this.feedback) {
-      constraints.push('7. IMPORTANTE: Las recomendaciones deben estar directamente relacionadas con la solicitud del usuario');
-      constraints.push('8. Si el usuario pide un tema específico (ej: informática, tecnología), TODAS las recomendaciones deben ser sobre ese tema');
+      constraints.push('8. IMPORTANTE: Las recomendaciones deben estar directamente relacionadas con la solicitud del usuario');
+      constraints.push('9. Si el usuario pide un tema específico (ej: informática, tecnología), TODAS las recomendaciones deben ser sobre ese tema');
     }
 
     return constraints.join('\n');

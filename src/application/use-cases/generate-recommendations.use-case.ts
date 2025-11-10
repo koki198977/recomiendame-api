@@ -70,16 +70,35 @@ export class GenerateRecommendationsUseCase {
       .withFeedback(feedback || '')
       .build();
     console.log("prompt: "+prompt)
-    // 3) Generate recommendations from AI
+    // 3) Generate recommendations from AI (with retry if too many duplicates)
     console.log('🤖 Generating recommendations with prompt...');
-    const raw = await this.openAi.generate(prompt);
+    let raw = await this.openAi.generate(prompt);
     console.log('📝 OpenAI raw response:', raw);
     
     let aiTitles = this.parseRecommendations(raw);
     console.log('✅ Parsed titles:', aiTitles);
+    
+    // Quick check: if all titles are in recent recommendations, regenerate once
+    const allAreDuplicates = aiTitles.every(title => {
+      const lower = title.toLowerCase();
+      return recentRecs.some(r => r.tmdb?.title.toLowerCase() === lower);
+    });
+    
+    if (allAreDuplicates && aiTitles.length > 0) {
+      console.log('⚠️ All AI titles are duplicates, regenerating with more creativity...');
+      const retryPrompt = prompt + '\n\nIMPORTANTE: Los títulos anteriores ya fueron recomendados. Genera 5 títulos COMPLETAMENTE DIFERENTES.';
+      raw = await this.openAi.generate(retryPrompt);
+      aiTitles = this.parseRecommendations(raw);
+      console.log('🔄 Retry titles:', aiTitles);
+    }
 
     // 4) Search and score all candidates
-    const allPrevIds = new Set(allRecs.map(r => r.tmdbId));
+    // Only exclude recent recommendations (last 30), not all history
+    const recentCount = 30;
+    const recentRecsForExclusion = allRecs.slice(-recentCount);
+    const allPrevIds = new Set(recentRecsForExclusion.map(r => r.tmdbId));
+    
+    console.log(`📋 Excluding ${allPrevIds.size} recent recommendations (from last ${recentCount})`);
     
     let candidates = await this.searchAndScoreCandidates(
       aiTitles,
@@ -183,16 +202,17 @@ export class GenerateRecommendationsUseCase {
       console.log(`✅ Total candidates after trending: ${candidates.length}`);
     }
 
-    // 6) Last resort: if still not enough, allow re-recommendations from older ones
+    // 6) Last resort: if still not enough, allow re-recommendations from much older ones
     if (candidates.length < 5) {
-      console.log(`⚠️ Still only ${candidates.length} candidates, allowing re-recommendations from older items...`);
+      console.log(`⚠️ Still only ${candidates.length} candidates, allowing re-recommendations from much older items...`);
       
-      // Get older recommendations (not in recent 10)
+      // Get much older recommendations (not in recent 30)
       const olderRecs = allRecs
-        .filter(r => !recentRecs.some(recent => recent.tmdbId === r.tmdbId))
+        .filter(r => !recentRecsForExclusion.some(recent => recent.tmdbId === r.tmdbId))
         .slice(-20); // Last 20 older recommendations
       
       if (olderRecs.length > 0) {
+        console.log(`📚 Found ${olderRecs.length} older recommendations to consider`);
         const olderTitles = olderRecs
           .map(r => r.tmdb?.title)
           .filter(Boolean) as string[];
@@ -207,6 +227,8 @@ export class GenerateRecommendationsUseCase {
         
         candidates.push(...olderCandidates);
         console.log(`✅ Added ${olderCandidates.length} candidates from older recommendations`);
+      } else {
+        console.log(`⚠️ No older recommendations available`);
       }
     }
 
