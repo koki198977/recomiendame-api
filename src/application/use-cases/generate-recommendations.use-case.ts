@@ -92,12 +92,17 @@ export class GenerateRecommendationsUseCase {
       console.log('🔄 Retry titles:', aiTitles);
     }
 
-    // 4) Search and score all candidates
-    // Exclude ALL recommendations to avoid DB constraint errors
-    // We'll allow re-recommendations only in the fallback if needed
-    const allPrevIds = new Set(allRecs.map(r => r.tmdbId));
+    // 4) Determine if this is a specific search query (allow duplicates) or general recommendation (avoid duplicates)
+    const isSpecificSearch = this.isSpecificSearchQuery(feedback);
     
-    console.log(`📋 Excluding ${allPrevIds.size} previously recommended titles`);
+    let allPrevIds: Set<number>;
+    if (isSpecificSearch) {
+      console.log(`🔍 Detected specific search query: "${feedback}" - allowing all results`);
+      allPrevIds = new Set(); // Don't exclude anything for specific searches
+    } else {
+      allPrevIds = new Set(allRecs.map(r => r.tmdbId));
+      console.log(`📋 General recommendation - excluding ${allPrevIds.size} previously recommended titles`);
+    }
     
     let candidates = await this.searchAndScoreCandidates(
       aiTitles,
@@ -298,10 +303,61 @@ export class GenerateRecommendationsUseCase {
     const results = await this.saveRecommendations(
       bestRecs,
       userId,
-      allPrevIds
+      allPrevIds,
+      isSpecificSearch
     );
 
     return this.mapToResponse(results);
+  }
+
+  private isSpecificSearchQuery(feedback?: string): boolean {
+    if (!feedback) return false;
+
+    const lower = feedback.toLowerCase();
+    
+    // Patterns that indicate a specific search/request
+    const specificPatterns = [
+      'mejores',
+      'top',
+      'recomendaciones de',
+      'series de',
+      'películas de',
+      'contenido de',
+      'qué ver en',
+      'que ver en',
+      'muéstrame',
+      'muestrame',
+      'busca',
+      'encuentra',
+      'lista de',
+      'cuáles son',
+      'cuales son',
+    ];
+
+    // Platform names
+    const platforms = [
+      'netflix',
+      'amazon',
+      'prime',
+      'disney',
+      'hbo',
+      'apple tv',
+      'paramount',
+      'hulu',
+    ];
+
+    // Check if feedback contains specific patterns
+    const hasSpecificPattern = specificPatterns.some(pattern => lower.includes(pattern));
+    const hasPlatform = platforms.some(platform => lower.includes(platform));
+
+    // It's a specific search if:
+    // - Contains "mejores/top" + platform (e.g., "mejores series de netflix")
+    // - Contains "qué ver en" + platform
+    // - Contains specific request patterns
+    return (hasSpecificPattern && hasPlatform) || 
+           (lower.includes('qué ver') || lower.includes('que ver')) ||
+           lower.includes('muéstrame') ||
+           lower.includes('muestrame');
   }
 
   private deduplicateCandidates(candidates: any[]): any[] {
@@ -522,7 +578,8 @@ Si ninguno coincide bien, responde con "NINGUNO".
   private async saveRecommendations(
     scoredRecs: any[],
     userId: string,
-    excludeIds: Set<number>
+    excludeIds: Set<number>,
+    isSpecificSearch: boolean = false
   ): Promise<Array<{ entity: Recommendation; score: number }>> {
     const results: Array<{ entity: Recommendation; score: number }> = [];
     const savedIds = new Set<number>(); // Track what we save in this batch
@@ -574,10 +631,13 @@ Si ninguno coincide bien, responde con "NINGUNO".
         item,
       );
 
-      // Check if it's a re-recommendation (has the marker in reasons)
-      const isReRecommendation = scored.reasons.some(r => r.includes('🔄'));
-      
-      if (!excludeIds.has(item.id)) {
+      // For specific searches, don't save to DB (just return results)
+      // For general recommendations, save only if new
+      if (isSpecificSearch) {
+        console.log(`🔍 Search result (not saving): ${item.title} (ID: ${item.id})`);
+        results.push({ entity: recEntity, score: scored.score });
+      } else if (!excludeIds.has(item.id)) {
+        // General recommendation - save if new
         try {
           await this.recommendationRepo.save(recEntity);
           await this.activityLogRepo.log(
@@ -592,19 +652,15 @@ Si ninguno coincide bien, responde con "NINGUNO".
           );
           savedIds.add(item.id);
           console.log(`✅ Saved recommendation: ${item.title} (ID: ${item.id})`);
+          results.push({ entity: recEntity, score: scored.score });
         } catch (error) {
           console.error(`❌ Failed to save recommendation ${item.title}:`, error.message);
           // Skip this one but continue with others
           continue;
         }
-      } else if (isReRecommendation) {
-        // It's a re-recommendation, don't save to DB but include in response
-        console.log(`🔄 Re-recommendation (not saving to DB): ${item.title}`);
       } else {
         console.log(`⏭️  Not saving (already recommended): ${item.title}`);
       }
-
-      results.push({ entity: recEntity, score: scored.score });
     }
 
     return results;
