@@ -69,7 +69,11 @@ export class RecommendationPromptBuilder {
     // User context
     if (this.feedback) {
       sections.push('## SOLICITUD DEL USUARIO');
-      sections.push(this.feedback + '\n');
+      sections.push(this.feedback);
+      sections.push('');
+      sections.push('IMPORTANTE: Interpreta la solicitud y recomienda títulos que coincidan con el tema o género solicitado.');
+      sections.push('Si menciona "informática", "tecnología", "hackers", etc., recomienda series/películas sobre programación, tecnología, startups, hackers, IA, etc.');
+      sections.push('');
     }
 
     // Preferences analysis
@@ -84,13 +88,23 @@ export class RecommendationPromptBuilder {
     sections.push('\n## RESTRICCIONES');
     sections.push(this.buildConstraintsSection());
 
-    // Output format
-    sections.push('\n## FORMATO DE RESPUESTA');
-    sections.push('Responde ÚNICAMENTE con los títulos, uno por línea.');
-    sections.push('NO incluyas numeración, descripciones, ni explicaciones.');
-    sections.push('Ejemplo:');
+    // Output format - MÁS EXPLÍCITO
+    sections.push('\n## FORMATO DE RESPUESTA OBLIGATORIO');
+    sections.push('Debes responder con EXACTAMENTE 5 títulos de películas o series.');
+    sections.push('Formato: Un título por línea, sin números, sin guiones, sin descripciones.');
+    sections.push('');
+    sections.push('Ejemplo correcto:');
     sections.push('The Shawshank Redemption');
     sections.push('Breaking Bad');
+    sections.push('Inception');
+    sections.push('The Wire');
+    sections.push('Parasite');
+    sections.push('');
+    sections.push('NO hagas esto:');
+    sections.push('1. The Shawshank Redemption - Una historia sobre...');
+    sections.push('- Breaking Bad (Serie de drama)');
+    sections.push('');
+    sections.push('RESPONDE AHORA CON 5 TÍTULOS:');
 
     return sections.join('\n');
   }
@@ -211,6 +225,11 @@ export class RecommendationPromptBuilder {
     constraints.push('4. Prioriza títulos de calidad reconocida (crítica o audiencia)');
     constraints.push('5. Balancea entre títulos populares y joyas ocultas');
     constraints.push('6. Considera tanto películas como series, a menos que el usuario tenga preferencia clara');
+    
+    if (this.feedback) {
+      constraints.push('7. IMPORTANTE: Las recomendaciones deben estar directamente relacionadas con la solicitud del usuario');
+      constraints.push('8. Si el usuario pide un tema específico (ej: informática, tecnología), TODAS las recomendaciones deben ser sobre ese tema');
+    }
 
     return constraints.join('\n');
   }

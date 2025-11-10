@@ -71,11 +71,40 @@ export class GenerateRecommendationsUseCase {
       .build();
     console.log("prompt: "+prompt)
     // 3) Generate recommendations from AI
+    console.log('🤖 Generating recommendations with prompt...');
     const raw = await this.openAi.generate(prompt);
+    console.log('📝 OpenAI raw response:', raw);
+    
     const aiTitles = this.parseRecommendations(raw);
+    console.log('✅ Parsed titles:', aiTitles);
 
     // 4) Search and score all candidates
     const allPrevIds = new Set(allRecs.map(r => r.tmdbId));
+    
+    // If AI didn't return enough titles, try a more specific search based on feedback
+    if (aiTitles.length < 3 && feedback) {
+      console.log('⚠️ AI returned few titles, searching TMDB directly with feedback...');
+      
+      // Try searching with keywords from feedback
+      const keywords = this.extractKeywords(feedback);
+      console.log('🔑 Extracted keywords:', keywords);
+      
+      for (const keyword of keywords) {
+        const directSearchResults = await this.tmdbService.search(keyword);
+        const directTitles = directSearchResults
+          .slice(0, 3)
+          .map(r => r.title)
+          .filter(t => {
+            const item = directSearchResults.find(r => r.title === t);
+            return item && !allPrevIds.has(item.id);
+          });
+        aiTitles.push(...directTitles);
+        console.log(`🔍 Added ${directTitles.length} results for keyword "${keyword}":`, directTitles);
+        
+        if (aiTitles.length >= 8) break; // Enough candidates
+      }
+    }
+    
     const candidates = await this.searchAndScoreCandidates(
       aiTitles,
       user,
@@ -84,8 +113,11 @@ export class GenerateRecommendationsUseCase {
       allPrevIds
     );
 
+    console.log(`📊 Found ${candidates.length} candidates after scoring`);
+
     // 5) If not enough, add trending items
     if (candidates.length < 5) {
+      console.log(`⚠️ Only ${candidates.length} candidates, adding trending...`);
       const trendingCandidates = await this.addTrendingCandidates(
         5 - candidates.length,
         user,
@@ -94,6 +126,7 @@ export class GenerateRecommendationsUseCase {
         allPrevIds
       );
       candidates.push(...trendingCandidates);
+      console.log(`✅ Total candidates after trending: ${candidates.length}`);
     }
 
     // 6) Select best 5 with diversity
@@ -130,23 +163,42 @@ export class GenerateRecommendationsUseCase {
       ? 'tv' 
       : undefined;
 
+    console.log(`🔍 Searching and scoring ${titles.length} titles...`);
+
     for (const title of titles) {
-      const results = await this.tmdbService.search(title);
-      const first = results[0];
-      
-      if (!first || excludeIds.has(first.id)) continue;
+      try {
+        console.log(`  Searching: "${title}"`);
+        const results = await this.tmdbService.search(title);
+        
+        if (results.length === 0) {
+          console.log(`  ❌ No results found for: "${title}"`);
+          continue;
+        }
 
-      const scored = RecommendationScorer.score(first, {
-        userFavoriteGenres: user.favoriteGenres || [],
-        userAvgRating: avgRating,
-        userFavorites: favorites,
-        userRatings: ratings,
-        preferredMediaType,
-      });
+        const first = results[0];
+        console.log(`  ✅ Found: ${first.title} (ID: ${first.id})`);
+        
+        if (excludeIds.has(first.id)) {
+          console.log(`  ⏭️  Skipping (already recommended): ${first.title}`);
+          continue;
+        }
 
-      candidates.push(scored);
+        const scored = RecommendationScorer.score(first, {
+          userFavoriteGenres: user.favoriteGenres || [],
+          userAvgRating: avgRating,
+          userFavorites: favorites,
+          userRatings: ratings,
+          preferredMediaType,
+        });
+
+        console.log(`  📊 Score: ${scored.score} - ${scored.reasons.join(', ')}`);
+        candidates.push(scored);
+      } catch (error) {
+        console.error(`  ❌ Error searching "${title}":`, error.message);
+      }
     }
 
+    console.log(`✅ Total valid candidates: ${candidates.length}`);
     return candidates;
   }
 
@@ -280,11 +332,70 @@ export class GenerateRecommendationsUseCase {
     });
   }
 
+  private extractKeywords(feedback: string): string[] {
+    const keywords: string[] = [];
+    const lower = feedback.toLowerCase();
+    
+    // Map common themes to search terms
+    const themeMap: Record<string, string[]> = {
+      'informática': ['hacker', 'programmer', 'silicon valley', 'tech', 'computer'],
+      'tecnología': ['tech', 'ai', 'robot', 'future', 'cyber'],
+      'hackers': ['hacker', 'cyber', 'security'],
+      'programación': ['programmer', 'developer', 'coding', 'silicon valley'],
+      'inteligencia artificial': ['ai', 'artificial intelligence', 'robot'],
+      'ciencia ficción': ['sci-fi', 'space', 'future'],
+      'terror': ['horror', 'scary', 'thriller'],
+      'comedia': ['comedy', 'funny'],
+      'drama': ['drama'],
+      'acción': ['action'],
+    };
+    
+    // Check for theme matches
+    for (const [theme, searches] of Object.entries(themeMap)) {
+      if (lower.includes(theme)) {
+        keywords.push(...searches);
+      }
+    }
+    
+    // If no themes matched, use the feedback itself
+    if (keywords.length === 0) {
+      keywords.push(feedback);
+    }
+    
+    return [...new Set(keywords)].slice(0, 3); // Max 3 keywords
+  }
+
   private parseRecommendations(raw: string | string[]): string[] {
     const text = Array.isArray(raw) ? raw.join('\n') : raw;
-    return text
+    
+    const lines = text
       .split('\n')
       .map(l => l.trim())
-      .filter(l => l.length > 0);
+      .filter(l => l.length > 0)
+      // Remove common prefixes
+      .map(l => {
+        // Remove numbering: "1. Title", "1) Title", "1 - Title"
+        l = l.replace(/^\d+[\.\)\-\:]\s*/, '');
+        // Remove bullet points: "- Title", "* Title", "• Title"
+        l = l.replace(/^[\-\*•]\s*/, '');
+        // Remove quotes
+        l = l.replace(/^["']|["']$/g, '');
+        return l.trim();
+      })
+      .filter(l => {
+        // Filter out lines that look like descriptions or instructions
+        const lower = l.toLowerCase();
+        if (lower.startsWith('ejemplo')) return false;
+        if (lower.startsWith('responde')) return false;
+        if (lower.startsWith('no incluyas')) return false;
+        if (lower.startsWith('formato')) return false;
+        if (lower.includes('por línea')) return false;
+        if (l.length < 2) return false;
+        if (l.length > 100) return false; // Titles shouldn't be this long
+        return true;
+      });
+
+    console.log('🔍 Parsed lines after cleaning:', lines);
+    return lines;
   }
 }
