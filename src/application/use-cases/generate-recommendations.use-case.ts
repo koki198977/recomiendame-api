@@ -482,9 +482,22 @@ export class GenerateRecommendationsUseCase {
   ): RecommendationResponse[] {
     return results.map(({ entity: rec, score }) => {
       const rd = rec.tmdb!;
-      const release = typeof rd.releaseDate === 'string'
-        ? new Date(rd.releaseDate).toISOString()
-        : rd.releaseDate!.toISOString();
+      
+      // Safe date handling
+      let release: string | undefined;
+      try {
+        if (rd.releaseDate) {
+          if (typeof rd.releaseDate === 'string') {
+            const date = new Date(rd.releaseDate);
+            release = isNaN(date.getTime()) ? undefined : date.toISOString();
+          } else if (rd.releaseDate instanceof Date) {
+            release = isNaN(rd.releaseDate.getTime()) ? undefined : rd.releaseDate.toISOString();
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️  Invalid release date for ${rd.title}:`, rd.releaseDate);
+        release = undefined;
+      }
 
       return {
         id:           rec.id,
@@ -493,8 +506,8 @@ export class GenerateRecommendationsUseCase {
         createdAt:    rec.createdAt.toISOString(),
         matchScore:   Math.round(score), // Score de 0-100
         title:        rd.title,
-        posterUrl:    rd.posterUrl!,
-        overview:     rd.overview!,
+        posterUrl:    rd.posterUrl || undefined,
+        overview:     rd.overview || undefined,
         releaseDate:  release,
         voteAverage:  rd.voteAverage,
         mediaType:    rd.mediaType,
