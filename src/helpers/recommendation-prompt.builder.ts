@@ -236,6 +236,7 @@ export class RecommendationPromptBuilder {
     constraints.push('2. PRIORIZA títulos similares a los que le ENCANTARON (⭐4-5)');
     constraints.push('3. EVITA títulos similares a los que NO le gustaron (❌)');
     constraints.push('4. NO repitas títulos que ya vio (👁️)');
+    constraints.push('5. NO recomiendes títulos que ya están en su lista de deseos (📝) - ya los conoce');
     
     if (this.recentRecs.length > 0) {
       const veryRecentTitles = this.recentRecs
@@ -243,15 +244,15 @@ export class RecommendationPromptBuilder {
         .map(r => r.tmdb?.title)
         .filter(Boolean)
         .join(', ');
-      constraints.push(`5. Evita recomendar de nuevo (muy reciente): ${veryRecentTitles}`);
+      constraints.push(`6. Evita recomendar de nuevo (muy reciente): ${veryRecentTitles}`);
     }
 
-    constraints.push('6. Balancea entre títulos populares y joyas ocultas');
-    constraints.push('7. Incluye un MIX de películas Y series (al menos 2 de cada tipo)');
-    constraints.push('8. Prioriza VARIEDAD - diferentes géneros, épocas, estilos');
+    constraints.push('7. Balancea entre títulos populares y joyas ocultas');
+    constraints.push('8. Incluye un MIX de películas Y series (al menos 2 de cada tipo)');
+    constraints.push('9. Prioriza VARIEDAD - diferentes géneros, épocas, estilos');
     
     if (this.feedback) {
-      constraints.push('9. CRÍTICO: Las recomendaciones deben coincidir con la solicitud del usuario');
+      constraints.push('10. CRÍTICO: Las recomendaciones deben coincidir con la solicitud del usuario');
     }
 
     return constraints.join('\n');
