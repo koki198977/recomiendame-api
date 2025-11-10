@@ -109,6 +109,31 @@ export class GenerateRecommendationsUseCase {
 
     console.log(`📊 Found ${candidates.length} candidates after scoring`);
 
+    // If very few candidates and we have feedback, try regenerating with more specific instructions
+    if (candidates.length < 2 && feedback && aiTitles.length > 0) {
+      const duplicateCount = aiTitles.length - candidates.length;
+      if (duplicateCount >= 3) {
+        console.log(`⚠️ ${duplicateCount} of ${aiTitles.length} AI titles were duplicates. Regenerating with stricter instructions...`);
+        
+        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN: Los siguientes títulos YA fueron recomendados, NO los repitas: ${aiTitles.join(', ')}\n\nGenera 5 títulos COMPLETAMENTE DIFERENTES que cumplan con la solicitud.`;
+        
+        const retryRaw = await this.openAi.generate(retryPrompt);
+        const retryTitles = this.parseRecommendations(retryRaw);
+        console.log('🔄 Retry attempt with new titles:', retryTitles);
+        
+        const retryCandidates = await this.searchAndScoreCandidates(
+          retryTitles,
+          user,
+          favorites,
+          ratings,
+          allPrevIds
+        );
+        
+        candidates.push(...retryCandidates);
+        console.log(`✅ After retry: ${candidates.length} total candidates`);
+      }
+    }
+
     // If all AI recommendations were already recommended, try with feedback keywords
     if (candidates.length === 0 && feedback) {
       console.log('⚠️ All AI titles were duplicates, searching TMDB directly with feedback...');
@@ -208,9 +233,30 @@ export class GenerateRecommendationsUseCase {
     const uniqueCandidates = this.deduplicateCandidates(candidates);
     console.log(`🔄 Deduplicated: ${candidates.length} → ${uniqueCandidates.length} unique candidates`);
 
-    // 8) If STILL not enough after all fallbacks, use trending without exclusions
-    if (uniqueCandidates.length < 3) {
-      console.log(`⚠️ CRITICAL: Only ${uniqueCandidates.length} candidates, using trending without exclusions...`);
+    // 8) If not enough and user gave feedback, allow re-recommendations that match the feedback
+    if (uniqueCandidates.length < 3 && feedback) {
+      console.log(`⚠️ Only ${uniqueCandidates.length} candidates with feedback "${feedback}"`);
+      console.log(`🔄 Searching for previously recommended titles that match the feedback...`);
+      
+      // Get titles that were already recommended but match the feedback
+      const matchingOldRecs = await this.findMatchingOldRecommendations(
+        feedback,
+        allRecs,
+        user,
+        favorites,
+        ratings,
+        5 - uniqueCandidates.length
+      );
+      
+      if (matchingOldRecs.length > 0) {
+        uniqueCandidates.push(...matchingOldRecs);
+        console.log(`✅ Added ${matchingOldRecs.length} matching old recommendations`);
+      }
+    }
+
+    // 9) If STILL not enough and NO feedback, use trending
+    if (uniqueCandidates.length < 3 && !feedback) {
+      console.log(`⚠️ CRITICAL: Only ${uniqueCandidates.length} candidates, using trending...`);
       const emergencyTrending = await this.addTrendingCandidates(
         5 - uniqueCandidates.length,
         user,
@@ -228,11 +274,22 @@ export class GenerateRecommendationsUseCase {
     // 10) Ensure we have at least some recommendations
     if (bestRecs.length === 0) {
       console.error('❌ CRITICAL: No recommendations could be generated!');
-      console.error('This usually means:');
-      console.error('- User has seen most available content');
-      console.error('- Feedback is too specific');
-      console.error('- TMDB API issues');
-      throw new Error('No se pudieron generar recomendaciones nuevas. Has visto mucho contenido! Intenta con un feedback más general o espera a que se agregue más contenido.');
+      console.error(`User has ${allPrevIds.size} previous recommendations`);
+      console.error(`Feedback: ${feedback || 'none'}`);
+      throw new Error(
+        `No se pudieron generar recomendaciones nuevas. ` +
+        `Has visto ${allPrevIds.size} títulos! ` +
+        `Intenta con un feedback diferente o más general.`
+      );
+    }
+    
+    // Warn if we had to use re-recommendations
+    const hasReRecommendations = bestRecs.some(rec => 
+      allPrevIds.has(rec.item.id)
+    );
+    
+    if (hasReRecommendations) {
+      console.log(`⚠️ WARNING: Some recommendations are repeats because user has seen ${allPrevIds.size} titles`);
     }
 
     console.log(`🎯 Final selection: ${bestRecs.length} recommendations`);
@@ -260,6 +317,79 @@ export class GenerateRecommendationsUseCase {
     }
     
     return Array.from(seen.values());
+  }
+
+  private async findMatchingOldRecommendations(
+    feedback: string,
+    allRecs: any[],
+    user: any,
+    favorites: any[],
+    ratings: any[],
+    count: number
+  ): Promise<any[]> {
+    // Ask OpenAI which of the old recommendations match the feedback
+    const oldTitles = allRecs
+      .slice(-50) // Last 50 recommendations
+      .map(r => r.tmdb?.title)
+      .filter(Boolean);
+    
+    if (oldTitles.length === 0) return [];
+
+    const matchPrompt = `
+De la siguiente lista de títulos, selecciona los ${count} que MEJOR coincidan con: "${feedback}"
+
+Títulos disponibles:
+${oldTitles.join('\n')}
+
+Responde SOLO con los títulos que coincidan, uno por línea, sin numeración.
+Si ninguno coincide bien, responde con "NINGUNO".
+`;
+
+    try {
+      const response = await this.openAi.generate(matchPrompt);
+      
+      if (response.trim().toUpperCase() === 'NINGUNO') {
+        console.log('❌ No matching old recommendations found');
+        return [];
+      }
+
+      const matchingTitles = this.parseRecommendations(response);
+      console.log(`🔍 OpenAI found ${matchingTitles.length} matching old titles:`, matchingTitles);
+
+      // Search and score these matching titles
+      const avgRating = ratings.length > 0
+        ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+        : 3.5;
+
+      const candidates: any[] = [];
+      for (const title of matchingTitles.slice(0, count)) {
+        try {
+          const results = await this.tmdbService.search(title);
+          const first = results[0];
+          
+          if (!first) continue;
+
+          const scored = RecommendationScorer.score(first, {
+            userFavoriteGenres: user.favoriteGenres || [],
+            userAvgRating: avgRating,
+            userFavorites: favorites,
+            userRatings: ratings,
+          });
+
+          // Mark as re-recommendation by adding to reasons
+          scored.reasons.unshift('🔄 Recomendado nuevamente');
+          
+          candidates.push(scored);
+        } catch (error) {
+          console.error(`Error searching old recommendation "${title}":`, error.message);
+        }
+      }
+
+      return candidates;
+    } catch (error) {
+      console.error('Error finding matching old recommendations:', error.message);
+      return [];
+    }
   }
 
   private async searchAndScoreCandidates(
@@ -444,7 +574,9 @@ export class GenerateRecommendationsUseCase {
         item,
       );
 
-      // Save if new
+      // Check if it's a re-recommendation (has the marker in reasons)
+      const isReRecommendation = scored.reasons.some(r => r.includes('🔄'));
+      
       if (!excludeIds.has(item.id)) {
         try {
           await this.recommendationRepo.save(recEntity);
@@ -465,6 +597,9 @@ export class GenerateRecommendationsUseCase {
           // Skip this one but continue with others
           continue;
         }
+      } else if (isReRecommendation) {
+        // It's a re-recommendation, don't save to DB but include in response
+        console.log(`🔄 Re-recommendation (not saving to DB): ${item.title}`);
       } else {
         console.log(`⏭️  Not saving (already recommended): ${item.title}`);
       }

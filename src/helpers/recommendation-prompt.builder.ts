@@ -231,6 +231,11 @@ export class RecommendationPromptBuilder {
         .filter(Boolean)
         .join(', ');
       constraints.push(`3. CRÍTICO: NO repitas NINGUNA de estas recomendaciones previas: ${recentTitles}`);
+      
+      // Extra warning for power users
+      if (this.recentRecs.length > 50) {
+        constraints.push('   ⚠️ Este usuario tiene MUCHAS recomendaciones previas. Busca títulos MÁS ESPECÍFICOS y MENOS CONOCIDOS.');
+      }
     }
 
     constraints.push('4. Prioriza títulos de calidad reconocida (crítica o audiencia)');
