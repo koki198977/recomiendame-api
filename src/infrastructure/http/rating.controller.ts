@@ -31,10 +31,29 @@ export class RatingController {
   async getUserRatings(
     @Request() req,
     @Query() query: ListQueryDto,
+    @Query('tmdbId') tmdbId?: string,
   ) {
     const userId = req.user.sub;
-    const ratings = await this.getUserRatingsUseCase.execute(userId, query);
-    return { ratings };
+    const result = await this.getUserRatingsUseCase.execute(userId, query);
+    
+    // If tmdbId is provided, filter to return only that specific rating
+    if (tmdbId) {
+      const tmdbIdNum = Number(tmdbId);
+      const specificRating = result.items.find(r => r.tmdbId === tmdbIdNum);
+      return { 
+        rating: specificRating || null,
+        hasRating: !!specificRating 
+      };
+    }
+    
+    return { 
+      ratings: result.items, 
+      total: result.total, 
+      page: result.page, 
+      pageSize: result.pageSize,
+      totalPages: result.totalPages,
+      hasNextPage: result.hasNextPage
+    };
   }
 
   @Delete(':tmdbId')
