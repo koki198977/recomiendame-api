@@ -11,6 +11,8 @@ import cuid from 'cuid';
 import { TMDB_REPOSITORY, TmdbRepository } from '../ports/tmdb.repository';
 import { Tmdb } from 'src/domain/entities/tmdb';
 import { RecommendationResponse } from 'src/domain/entities/recommendation.response';
+import { RecommendationPromptBuilder } from 'src/helpers/recommendation-prompt.builder';
+import { RecommendationScorer } from 'src/helpers/recommendation-scorer';
 
 @Injectable()
 export class GenerateRecommendationsUseCase {
@@ -34,7 +36,7 @@ export class GenerateRecommendationsUseCase {
     feedback?: string,
     tmdbId?: number
   ): Promise<RecommendationResponse[]> {
-    // 1) Cargar datos
+    // 1) Load user data
     const [
       seenItems,
       favorites,
@@ -53,151 +55,206 @@ export class GenerateRecommendationsUseCase {
       this.userDataRepo.getWishlist(userId),
     ]);
 
-    const favoriteGenres    = user?.favoriteGenres || [];
-    const favoriteMediaText = user?.favoriteMedia?.trim();
+    if (!user) {
+      throw new Error('User not found');
+    }
 
-    // build sets
-    const recentTitles = new Set(
-      recentRecs.map(r => r.tmdb?.title.toLowerCase()).filter(Boolean)
-    );
+    // 2) Build intelligent prompt
+    const prompt = new RecommendationPromptBuilder()
+      .withUser(user)
+      .withSeenItems(seenItems)
+      .withFavorites(favorites)
+      .withRatings(ratings)
+      .withRecentRecommendations(recentRecs)
+      .withWishlist(wishlist)
+      .withFeedback(feedback || '')
+      .build();
+    console.log("prompt: "+prompt)
+    // 3) Generate recommendations from AI
+    const raw = await this.openAi.generate(prompt);
+    const aiTitles = this.parseRecommendations(raw);
+
+    // 4) Search and score all candidates
     const allPrevIds = new Set(allRecs.map(r => r.tmdbId));
-
-    // last 5 of seen/fav/ratings
-    const last5 = <T>(arr: T[]) => arr.slice(-5);
-    const seen5 = last5(seenItems.map(i => i.tmdb?.title).filter(Boolean) as string[]);
-    const fav5  = last5(favorites.map(f => f.tmdb?.title).filter(Boolean) as string[]);
-    const wish5 = last5(wishlist.map(w => w.tmdb?.title).filter(Boolean) as string[]);
-    const ratings5 = last5(
-      ratings
-        .map(r => `${r.tmdb?.title} (${r.rating}/5)`)
-        .filter(Boolean) as string[]
+    const candidates = await this.searchAndScoreCandidates(
+      aiTitles,
+      user,
+      favorites,
+      ratings,
+      allPrevIds
     );
 
-    // construct prompt
-    const sections: string[] = [];
-
-    if (feedback) {
-      sections.push(
-        'Eres un recomendador personalizado de películas y series. A partir del siguiente texto del usuario, genera 5 títulos relevantes sin repetir anteriores.'
+    // 5) If not enough, add trending items
+    if (candidates.length < 5) {
+      const trendingCandidates = await this.addTrendingCandidates(
+        5 - candidates.length,
+        user,
+        favorites,
+        ratings,
+        allPrevIds
       );
-      sections.push(`Feedback del usuario: ${feedback}`);
-    } else {
-      sections.push(
-        'Eres un recomendador de películas y series. Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.'
-      );
-      if (favoriteGenres.length) {
-        sections.push(
-          `Prioriza los géneros favoritos del usuario: ${favoriteGenres.join(', ')}`
-        );
-      }
+      candidates.push(...trendingCandidates);
     }
 
-    if (recentRecs.length === 0 && favoriteMediaText) {
-      sections.push(`Sobre sus gustos: ${favoriteMediaText}`);
-    }
+    // 6) Select best 5 with diversity
+    const bestRecs = RecommendationScorer.diversify(candidates, 5);
 
-    if (seen5.length)    sections.push(`Vistos (últ. 5): ${seen5.join(', ')}`);
-    if (fav5.length)     sections.push(`Favoritas (últ. 5): ${fav5.join(', ')}`);
-    if (wish5.length)    sections.push(`Deseados (últ. 5): ${wish5.join(', ')}`);
-    if (ratings5.length) sections.push(`Puntuaciones (últ. 5): ${ratings5.join(', ')}`);
-    if (recentRecs.length) {
-      const prev5 = last5(
-        recentRecs.map(r => r.tmdb?.title.toLowerCase()).filter(Boolean) as string[]
-      );
-      sections.push(`Ya recomendadas (últ. 5): ${prev5.join(', ')}`);
-    }
-
-    sections.push(
-      'Si no puedes generar exactamente 5 títulos nuevos (que no estén en tu historial ni en recomendaciones previas), completa la lista con las películas o series más populares según la crítica.'
-    );
-    sections.push(
-      'Responde únicamente con los nombres de las películas o series, uno por línea, sin numeración ni descripciones.'
+    // 7) Save and return
+    const results = await this.saveRecommendations(
+      bestRecs,
+      userId,
+      allPrevIds
     );
 
-    const prompt = sections.join('\n');
-    const raw   = await this.openAi.generate(prompt);
+    return this.mapToResponse(results);
+  }
 
+  private async searchAndScoreCandidates(
+    titles: string[],
+    user: any,
+    favorites: any[],
+    ratings: any[],
+    excludeIds: Set<number>
+  ) {
+    const candidates: any[] = [];
+    const avgRating = ratings.length > 0
+      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+      : 3.5;
 
-    const parsed = this.parseRecommendations(raw);
-   
+    // Detect preferred media type
+    const movieCount = favorites.filter(f => f.tmdb?.mediaType === 'movie').length;
+    const seriesCount = favorites.filter(f => f.tmdb?.mediaType === 'tv').length;
+    const preferredMediaType = movieCount > seriesCount * 1.5 
+      ? 'movie' 
+      : seriesCount > movieCount * 1.5 
+      ? 'tv' 
+      : undefined;
 
-    // filter out any titles seen in recent recs
-    const unique = Array.from(new Set(parsed))
-      .filter(title => !recentTitles.has(title.toLowerCase()));
-
-    // complete with trending if fewer than 5
-    let finalTitles = unique.slice(0, 5);
-    if (finalTitles.length < 5) {
-      const needed = 5 - finalTitles.length;
-      const trending = await this.tmdbService.getTrending(needed);
-      for (const t of trending) {
-        if (finalTitles.length >= 5) break;
-        if (!finalTitles.includes(t.title)) {
-          finalTitles.push(t.title);
-        }
-      }
-    }
-
-
-    
-    const entities: Recommendation[] = [];
-
-    for (const title of finalTitles) {
+    for (const title of titles) {
       const results = await this.tmdbService.search(title);
       const first = results[0];
-      if (!first) continue;
+      
+      if (!first || excludeIds.has(first.id)) continue;
 
-      if (!allPrevIds.has(first.id)) {
+      const scored = RecommendationScorer.score(first, {
+        userFavoriteGenres: user.favoriteGenres || [],
+        userAvgRating: avgRating,
+        userFavorites: favorites,
+        userRatings: ratings,
+        preferredMediaType,
+      });
+
+      candidates.push(scored);
+    }
+
+    return candidates;
+  }
+
+  private async addTrendingCandidates(
+    count: number,
+    user: any,
+    favorites: any[],
+    ratings: any[],
+    excludeIds: Set<number>
+  ) {
+    const trending = await this.tmdbService.getTrending(count * 2);
+    const candidates: any[] = [];
+
+    const avgRating = ratings.length > 0
+      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
+      : 3.5;
+
+    for (const trendingItem of trending) {
+      if (excludeIds.has(trendingItem.id)) continue;
+
+      // Search to get full details
+      const results = await this.tmdbService.search(trendingItem.title);
+      const item = results[0];
+      
+      if (!item || excludeIds.has(item.id)) continue;
+
+      const scored = RecommendationScorer.score(item, {
+        userFavoriteGenres: user.favoriteGenres || [],
+        userAvgRating: avgRating,
+        userFavorites: favorites,
+        userRatings: ratings,
+      });
+
+      candidates.push(scored);
+    }
+
+    return RecommendationScorer.selectBest(candidates, count);
+  }
+
+  private async saveRecommendations(
+    scoredRecs: any[],
+    userId: string,
+    excludeIds: Set<number>
+  ): Promise<Array<{ entity: Recommendation; score: number }>> {
+    const results: Array<{ entity: Recommendation; score: number }> = [];
+
+    for (const scored of scoredRecs) {
+      const item = scored.item;
+
+      // Save to TMDB cache if new
+      if (!excludeIds.has(item.id)) {
         await this.tmdbRepository.save(
           new Tmdb(
-            first.id,
-            first.title,
+            item.id,
+            item.title,
             new Date(),
-            first.posterUrl ?? undefined,
-            first.overview ?? undefined,
-            first.releaseDate ? new Date(first.releaseDate) : undefined,
-            first.genreIds || [],
-            first.popularity || 0,
-            first.voteAverage || 0,
-            first.mediaType || 'movie',
-            first.platforms ?? [],
-            first.trailerUrl ?? undefined,
+            item.posterUrl ?? undefined,
+            item.overview ?? undefined,
+            item.releaseDate ? new Date(item.releaseDate) : undefined,
+            item.genreIds || [],
+            item.popularity || 0,
+            item.voteAverage || 0,
+            item.mediaType || 'movie',
+            item.platforms ?? [],
+            item.trailerUrl ?? undefined,
           )
         );
       }
 
-      // create a Recommendation entity that always includes metadata
+      // Create recommendation with intelligent reason
+      const reason = scored.reasons.length > 0
+        ? scored.reasons.join(' • ')
+        : 'Recomendado por IA';
+
       const recEntity = new Recommendation(
         cuid(),
         userId,
-        first.id,
-        'Recomendado por IA',
+        item.id,
+        reason,
         new Date(),
-        first, // metadata, ensures recEntity.tmdb is defined
+        item,
       );
 
-      // persist recommendation & activity log if new
-      if (!allPrevIds.has(first.id)) {
+      // Save if new
+      if (!excludeIds.has(item.id)) {
         await this.recommendationRepo.save(recEntity);
         await this.activityLogRepo.log(
           new ActivityLog(
             undefined,
             userId,
             'recommended',
-            first.id,
-            'Recomendado por IA',
+            item.id,
+            reason,
             new Date(),
           )
         );
       }
 
-      entities.push(recEntity);
+      results.push({ entity: recEntity, score: scored.score });
     }
 
+    return results;
+  }
 
-
-    // map to DTO
-    const dtos: RecommendationResponse[] = entities.map(rec => {
+  private mapToResponse(
+    results: Array<{ entity: Recommendation; score: number }>
+  ): RecommendationResponse[] {
+    return results.map(({ entity: rec, score }) => {
       const rd = rec.tmdb!;
       const release = typeof rd.releaseDate === 'string'
         ? new Date(rd.releaseDate).toISOString()
@@ -208,6 +265,7 @@ export class GenerateRecommendationsUseCase {
         tmdbId:       rec.tmdbId,
         reason:       rec.reason,
         createdAt:    rec.createdAt.toISOString(),
+        matchScore:   Math.round(score), // Score de 0-100
         title:        rd.title,
         posterUrl:    rd.posterUrl!,
         overview:     rd.overview!,
@@ -220,8 +278,6 @@ export class GenerateRecommendationsUseCase {
         genreIds:     rd.genreIds,
       };
     });
-
-    return dtos;
   }
 
   private parseRecommendations(raw: string | string[]): string[] {

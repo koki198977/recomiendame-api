@@ -3,6 +3,7 @@ export class RecommendationResponse {
   tmdbId: number;
   reason: string;
   createdAt: string;
+  matchScore?: number; // Score de 0-100 indicando qué tan buena es la recomendación
 
   title?: string;
   posterUrl?: string;
@@ -13,4 +14,5 @@ export class RecommendationResponse {
   popularity?: number;
   platforms?: string[];
   trailerUrl?: string;
+  genreIds?: number[];
 }

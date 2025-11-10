@@ -1,98 +1,217 @@
-import { Injectable } from '@nestjs/common';
-import { Tmdb } from 'src/domain/entities/tmdb';
+import { User } from 'src/domain/entities/user';
+import { SeenItem } from 'src/domain/entities/seen-item';
+import { Favorite } from 'src/domain/entities/favorite';
+import { Rating } from 'src/domain/entities/rating';
 import { Recommendation } from 'src/domain/entities/recommendation';
 
-export interface PromptParams {
-  user: {
-    favoriteGenres?: string[];
-    favoriteMedia?: string;
-  };
-  seenItems: Array<{ tmdb?: Tmdb }>;
-  favorites: Array<{ tmdb?: Tmdb }>;
-  ratings: Array<{ tmdb?: Tmdb; rating: number }>;
-  recentRecs: Array<Recommendation>;
-  feedback?: string;
-  likedTmdbId?: number;
+interface UserPreferences {
+  favoriteGenres: string[];
+  favoriteMedia?: string;
+  avgRating?: number;
+  preferredMediaType?: 'movie' | 'series' | 'both';
+  preferredDecade?: string;
 }
 
-@Injectable()
 export class RecommendationPromptBuilder {
-  build(params: PromptParams): string {
-    const {
-      user,
-      seenItems,
-      favorites,
-      ratings,
-      recentRecs,
-      feedback,
-      likedTmdbId,
-    } = params;
+  private seenItems: SeenItem[] = [];
+  private favorites: Favorite[] = [];
+  private ratings: Rating[] = [];
+  private recentRecs: Recommendation[] = [];
+  private wishlist: Array<{ tmdbId: number; tmdb?: { title?: string } }> = [];
+  private user?: User;
+  private feedback?: string;
 
-    const favoriteGenres = user.favoriteGenres || [];
-    const favoriteMediaText = user.favoriteMedia?.trim();
+  withSeenItems(items: SeenItem[]): this {
+    this.seenItems = items;
+    return this;
+  }
 
-    // Extraer títulos
-    const lastTitles = <T>(arr: Array<{ tmdb?: T }>, mapFn: (i: T) => string): string[] =>
-      arr
-        .map(i => (i.tmdb ? mapFn(i.tmdb) : null))
-        .filter((t): t is string => Boolean(t))
-        .slice(-5);
+  withFavorites(items: Favorite[]): this {
+    this.favorites = items;
+    return this;
+  }
 
-    const seen5 = lastTitles(seenItems, tmdb => (tmdb as any).title);
-    const fav5 = lastTitles(favorites, tmdb => (tmdb as any).title);
-    const ratings5 = ratings
-      .map(r => {
-        const title = r.tmdb?.title;
-        return title ? `${title} (${r.rating}/5)` : null;
-      })
-      .filter((l): l is string => Boolean(l))
-      .slice(-5);
+  withRatings(items: Rating[]): this {
+    this.ratings = items;
+    return this;
+  }
 
-    const prev5 = recentRecs
-      .slice(-5)
-      .map(r => r.tmdb?.title.toLowerCase())
-      .filter((t): t is string => Boolean(t));
+  withRecentRecommendations(items: Recommendation[]): this {
+    this.recentRecs = items;
+    return this;
+  }
 
+  withWishlist(items: Array<{ tmdbId: number; tmdb?: { title?: string } }>): this {
+    this.wishlist = items;
+    return this;
+  }
+
+  withUser(user: User): this {
+    this.user = user;
+    return this;
+  }
+
+  withFeedback(feedback: string): this {
+    this.feedback = feedback;
+    return this;
+  }
+
+  build(): string {
+    const preferences = this.analyzePreferences();
     const sections: string[] = [];
 
-    if (feedback) {
-      sections.push(
-        'Eres un recomendador personalizado de películas y series. A partir del siguiente texto del usuario, genera 5 títulos relevantes sin repetir anteriores.'
-      );
-      sections.push(`🧠 Feedback del usuario: ${feedback}`);
-    } else {
-      sections.push(
-        'Eres un recomendador de películas y series. Recomienda exactamente 5 títulos que aún NO hayan sido vistos, favoritos ni recomendados previamente.'
-      );
-      if (favoriteGenres.length) {
-        sections.push(
-          `Prioriza los géneros favoritos del usuario: ${favoriteGenres.join(', ')}`
-        );
-      }
-    }
-
-    if (!recentRecs.length && favoriteMediaText) {
-      sections.push(`📝 Sobre sus gustos: ${favoriteMediaText}`);
-    }
-
-    if (seen5.length) sections.push(`🎬 Vistos (últ. 5): ${seen5.join(', ')}`);
-    if (fav5.length) sections.push(`⭐ Favoritas (últ. 5): ${fav5.join(', ')}`);
-    if (ratings5.length)
-      sections.push(`📝 Puntuaciones (últ. 5): ${ratings5.join(', ')}`);
-    if (prev5.length)
-      sections.push(`❌ Ya recomendadas (últ. 5): ${prev5.join(', ')}`);
-
-    if (likedTmdbId) {
-      sections.push(`👍 Le gustó: ID ${likedTmdbId}`);
-    }
-
+    // System role
     sections.push(
-      '⚠️ Si no puedes generar exactamente 5 títulos nuevos (que no estén en tu historial ni en recomendaciones previas), completa la lista con las películas o series más populares según la crítica.'
+      'Eres un experto recomendador de películas y series con profundo conocimiento cinematográfico.'
     );
-    sections.push(
-      '⚠️ Responde únicamente con los nombres de las películas o series, uno por línea, sin numeración ni descripciones.'
-    );
+    sections.push('Tu objetivo es generar recomendaciones personalizadas y relevantes.\n');
+
+    // User context
+    if (this.feedback) {
+      sections.push('## SOLICITUD DEL USUARIO');
+      sections.push(this.feedback + '\n');
+    }
+
+    // Preferences analysis
+    sections.push('## PERFIL DEL USUARIO');
+    sections.push(this.buildPreferencesSection(preferences));
+
+    // User history
+    sections.push('\n## HISTORIAL DEL USUARIO');
+    sections.push(this.buildHistorySection());
+
+    // Constraints
+    sections.push('\n## RESTRICCIONES');
+    sections.push(this.buildConstraintsSection());
+
+    // Output format
+    sections.push('\n## FORMATO DE RESPUESTA');
+    sections.push('Responde ÚNICAMENTE con los títulos, uno por línea.');
+    sections.push('NO incluyas numeración, descripciones, ni explicaciones.');
+    sections.push('Ejemplo:');
+    sections.push('The Shawshank Redemption');
+    sections.push('Breaking Bad');
 
     return sections.join('\n');
+  }
+
+  private analyzePreferences(): UserPreferences {
+    const prefs: UserPreferences = {
+      favoriteGenres: this.user?.favoriteGenres || [],
+      favoriteMedia: this.user?.favoriteMedia,
+    };
+
+    // Calculate average rating
+    if (this.ratings.length > 0) {
+      const sum = this.ratings.reduce((acc, r) => acc + r.rating, 0);
+      prefs.avgRating = sum / this.ratings.length;
+    }
+
+    // Detect preferred media type
+    const movieCount = this.favorites.filter(f => f.tmdb?.mediaType === 'movie').length;
+    const seriesCount = this.favorites.filter(f => f.tmdb?.mediaType === 'tv').length;
+    
+    if (movieCount > seriesCount * 1.5) {
+      prefs.preferredMediaType = 'movie';
+    } else if (seriesCount > movieCount * 1.5) {
+      prefs.preferredMediaType = 'series';
+    } else {
+      prefs.preferredMediaType = 'both';
+    }
+
+    return prefs;
+  }
+
+  private buildPreferencesSection(prefs: UserPreferences): string {
+    const lines: string[] = [];
+
+    if (prefs.favoriteGenres.length > 0) {
+      lines.push(`- Géneros favoritos: ${prefs.favoriteGenres.join(', ')}`);
+    }
+
+    if (prefs.favoriteMedia) {
+      lines.push(`- Gustos declarados: ${prefs.favoriteMedia}`);
+    }
+
+    if (prefs.avgRating) {
+      const standard = prefs.avgRating >= 4 ? 'altos' : prefs.avgRating >= 3 ? 'moderados' : 'variados';
+      lines.push(`- Estándares de calidad: ${standard} (promedio: ${prefs.avgRating.toFixed(1)}/5)`);
+    }
+
+    if (prefs.preferredMediaType !== 'both') {
+      const type = prefs.preferredMediaType === 'movie' ? 'películas' : 'series';
+      lines.push(`- Preferencia: ${type}`);
+    }
+
+    return lines.length > 0 ? lines.join('\n') : '- Sin preferencias definidas aún';
+  }
+
+  private buildHistorySection(): string {
+    const sections: string[] = [];
+
+    // High-rated items (4+ stars)
+    const highRated = this.ratings
+      .filter(r => r.rating >= 4)
+      .slice(-5)
+      .map(r => `${r.tmdb?.title} (${r.rating}/5)`)
+      .filter(Boolean);
+
+    if (highRated.length > 0) {
+      sections.push(`Títulos mejor valorados:\n${highRated.join(', ')}`);
+    }
+
+    // Favorites
+    const favTitles = this.favorites
+      .slice(-5)
+      .map(f => f.tmdb?.title)
+      .filter(Boolean);
+
+    if (favTitles.length > 0) {
+      sections.push(`Favoritos recientes:\n${favTitles.join(', ')}`);
+    }
+
+    // Wishlist
+    const wishTitles = this.wishlist
+      .slice(-5)
+      .map(w => w.tmdb?.title)
+      .filter(Boolean);
+
+    if (wishTitles.length > 0) {
+      sections.push(`En lista de deseos:\n${wishTitles.join(', ')}`);
+    }
+
+    // Recently seen
+    const seenTitles = this.seenItems
+      .slice(-8)
+      .map(s => s.tmdb?.title)
+      .filter(Boolean);
+
+    if (seenTitles.length > 0) {
+      sections.push(`Vistos recientemente:\n${seenTitles.join(', ')}`);
+    }
+
+    return sections.length > 0 ? sections.join('\n\n') : 'Sin historial previo';
+  }
+
+  private buildConstraintsSection(): string {
+    const constraints: string[] = [];
+
+    constraints.push('1. Genera EXACTAMENTE 5 recomendaciones');
+    constraints.push('2. NO repitas títulos que el usuario ya haya visto, marcado como favorito o estén en su wishlist');
+    
+    if (this.recentRecs.length > 0) {
+      const recentTitles = this.recentRecs
+        .slice(-10)
+        .map(r => r.tmdb?.title)
+        .filter(Boolean)
+        .join(', ');
+      constraints.push(`3. NO repitas estas recomendaciones previas: ${recentTitles}`);
+    }
+
+    constraints.push('4. Prioriza títulos de calidad reconocida (crítica o audiencia)');
+    constraints.push('5. Balancea entre títulos populares y joyas ocultas');
+    constraints.push('6. Considera tanto películas como series, a menos que el usuario tenga preferencia clara');
+
+    return constraints.join('\n');
   }
 }
