@@ -13,15 +13,15 @@ async function bootstrap() {
   // const allowedOrigins =
   //   envOrigins.length > 0 ? envOrigins : ['http://localhost:8080'];
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true, // elimina propiedades no permitidas
-      forbidNonWhitelisted: true, // lanza error si hay propiedades no permitidas
-      transform: true, // transforma payloads a clases
-    }),
-  );
-  const isProd = process.env.NODE_ENV === 'production';
-  app.use('/static', express.static(join(__dirname, '..', 'public')));
+  // app.useGlobalPipes(
+  //   new ValidationPipe({
+  //     whitelist: true, // elimina propiedades no permitidas
+  //     forbidNonWhitelisted: true, // lanza error si hay propiedades no permitidas
+  //     transform: true, // transforma payloads a clases
+  //   }),
+  // );
+  // const isProd = process.env.NODE_ENV === 'production';
+  // app.use('/static', express.static(join(__dirname, '..', 'public')));
 //   if(!isProd){
 //     app.enableCors({
 //     origin: (origin, callback) => {
