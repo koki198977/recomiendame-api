@@ -30,21 +30,40 @@ export class RatingController {
   @Get()
   async getUserRatings(
     @Request() req,
-    @Query() query: ListQueryDto,
     @Query('tmdbId') tmdbId?: string,
+    @Query('orderBy') orderBy?: 'createdAt' | 'title',
+    @Query('order') order?: 'asc' | 'desc',
+    @Query('mediaType') mediaType?: 'movie' | 'tv',
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('search') search?: string,
+    @Query('platform') platform?: string,
   ) {
     const userId = req.user.sub;
-    const result = await this.getUserRatingsUseCase.execute(userId, query);
     
-    // If tmdbId is provided, filter to return only that specific rating
+    // If tmdbId is provided, search for that specific rating
     if (tmdbId) {
       const tmdbIdNum = Number(tmdbId);
+      // Get all ratings without pagination to search
+      const result = await this.getUserRatingsUseCase.execute(userId, { take: 1000 });
       const specificRating = result.items.find(r => r.tmdbId === tmdbIdNum);
       return { 
         rating: specificRating || null,
         hasRating: !!specificRating 
       };
     }
+    
+    // Build query object for normal listing
+    const query: any = {};
+    if (orderBy) query.orderBy = orderBy;
+    if (order) query.order = order;
+    if (mediaType) query.mediaType = mediaType;
+    if (skip !== undefined) query.skip = skip;
+    if (take !== undefined) query.take = take;
+    if (search) query.search = search;
+    if (platform) query.platform = platform;
+    
+    const result = await this.getUserRatingsUseCase.execute(userId, query);
     
     return { 
       ratings: result.items, 
