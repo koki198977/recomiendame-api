@@ -92,27 +92,11 @@ export class GenerateRecommendationsUseCase {
       console.log('🔄 Retry titles:', aiTitles);
     }
 
-    // 4) Build exclusion list based on user ratings and recent activity
-    // Only exclude:
-    // - Items rated 3 or lower (user didn't like them)
-    // - Items in seen list (user already watched)
-    // - Items in wishlist (user already knows about them)
-    // - Very recent recommendations (last 10)
-    const lowRatedIds = new Set(
-      ratings.filter(r => r.rating <= 3).map(r => r.tmdbId)
-    );
-    const seenIds = new Set(seenItems.map(s => s.tmdbId));
-    const wishlistIds = new Set(wishlist.map(w => w.tmdbId));
-    const veryRecentIds = new Set(recentRecs.slice(-10).map(r => r.tmdbId));
+    // 4) Don't exclude anything - just show what OpenAI recommends
+    // The prompt already tells OpenAI what to avoid
+    const allPrevIds = new Set<number>(); // Empty set = no exclusions
     
-    const allPrevIds = new Set([
-      ...lowRatedIds,
-      ...seenIds,
-      ...wishlistIds,
-      ...veryRecentIds
-    ]);
-    
-    console.log(`📋 Excluding: ${lowRatedIds.size} low-rated + ${seenIds.size} seen + ${wishlistIds.size} wishlist + ${veryRecentIds.size} very recent = ${allPrevIds.size} total`);
+    console.log(`📋 No exclusions - showing all recommendations from AI`);
     
     let candidates = await this.searchAndScoreCandidates(
       aiTitles,

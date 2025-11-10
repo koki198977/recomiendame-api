@@ -63,6 +63,20 @@ export class RatingRepositoryImpl implements RatingRepository {
           r.rating,
           r.comment,
           r.createdAt,
+          r.tmdb ? {
+            id: r.tmdb.id,
+            title: r.tmdb.title,
+            createdAt: r.tmdb.createdAt,
+            posterUrl: r.tmdb.posterUrl ?? undefined,
+            overview: r.tmdb.overview ?? undefined,
+            releaseDate: r.tmdb.releaseDate ?? undefined,
+            genreIds: r.tmdb.genreIds as number[],
+            popularity: r.tmdb.popularity ?? undefined,
+            voteAverage: r.tmdb.voteAverage ?? undefined,
+            mediaType: (r.tmdb.mediaType as 'movie' | 'tv') ?? undefined,
+            platforms: r.tmdb.platforms as any,
+            trailerUrl: r.tmdb.trailerUrl ?? undefined,
+          } : undefined,
         ),
     );
 

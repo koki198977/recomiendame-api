@@ -44,12 +44,12 @@ export class GetDashboardStatsUseCase {
         movie: {
           seen: seen.filter((i) => i.tmdb?.mediaType === 'movie').length,
           favorites: favorites.filter((i) => i.tmdb?.mediaType === 'movie').length,
-          ratings: ratings.filter((i) => i.tmdb?.mediaType === 'movie').length,
+          ratings: ratings.filter((r) => r.tmdb?.mediaType === 'movie').length,
         },
         tv: {
           seen: seen.filter((i) => i.tmdb?.mediaType === 'tv').length,
           favorites: favorites.filter((i) => i.tmdb?.mediaType === 'tv').length,
-          ratings: ratings.filter((i) => i.tmdb?.mediaType === 'tv').length,
+          ratings: ratings.filter((r) => r.tmdb?.mediaType === 'tv').length,
         },
       },
       favoriteGenres: user.favoriteGenres || [],
