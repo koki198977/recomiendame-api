@@ -92,17 +92,24 @@ export class GenerateRecommendationsUseCase {
       console.log('🔄 Retry titles:', aiTitles);
     }
 
-    // 4) Determine if this is a specific search query (allow duplicates) or general recommendation (avoid duplicates)
-    const isSpecificSearch = this.isSpecificSearchQuery(feedback);
+    // 4) Build exclusion list based on user ratings and recent activity
+    // Only exclude:
+    // - Items rated 3 or lower (user didn't like them)
+    // - Items in seen list (user already watched)
+    // - Very recent recommendations (last 10)
+    const lowRatedIds = new Set(
+      ratings.filter(r => r.rating <= 3).map(r => r.tmdbId)
+    );
+    const seenIds = new Set(seenItems.map(s => s.tmdbId));
+    const veryRecentIds = new Set(recentRecs.slice(-10).map(r => r.tmdbId));
     
-    let allPrevIds: Set<number>;
-    if (isSpecificSearch) {
-      console.log(`🔍 Detected specific search query: "${feedback}" - allowing all results`);
-      allPrevIds = new Set(); // Don't exclude anything for specific searches
-    } else {
-      allPrevIds = new Set(allRecs.map(r => r.tmdbId));
-      console.log(`📋 General recommendation - excluding ${allPrevIds.size} previously recommended titles`);
-    }
+    const allPrevIds = new Set([
+      ...lowRatedIds,
+      ...seenIds,
+      ...veryRecentIds
+    ]);
+    
+    console.log(`📋 Excluding: ${lowRatedIds.size} low-rated + ${seenIds.size} seen + ${veryRecentIds.size} very recent = ${allPrevIds.size} total`);
     
     let candidates = await this.searchAndScoreCandidates(
       aiTitles,
@@ -299,65 +306,14 @@ export class GenerateRecommendationsUseCase {
 
     console.log(`🎯 Final selection: ${bestRecs.length} recommendations`);
 
-    // 11) Save and return
+    // 11) Save and return (always save, even if previously recommended)
     const results = await this.saveRecommendations(
       bestRecs,
       userId,
-      allPrevIds,
-      isSpecificSearch
+      allPrevIds
     );
 
     return this.mapToResponse(results);
-  }
-
-  private isSpecificSearchQuery(feedback?: string): boolean {
-    if (!feedback) return false;
-
-    const lower = feedback.toLowerCase();
-    
-    // Patterns that indicate a specific search/request
-    const specificPatterns = [
-      'mejores',
-      'top',
-      'recomendaciones de',
-      'series de',
-      'películas de',
-      'contenido de',
-      'qué ver en',
-      'que ver en',
-      'muéstrame',
-      'muestrame',
-      'busca',
-      'encuentra',
-      'lista de',
-      'cuáles son',
-      'cuales son',
-    ];
-
-    // Platform names
-    const platforms = [
-      'netflix',
-      'amazon',
-      'prime',
-      'disney',
-      'hbo',
-      'apple tv',
-      'paramount',
-      'hulu',
-    ];
-
-    // Check if feedback contains specific patterns
-    const hasSpecificPattern = specificPatterns.some(pattern => lower.includes(pattern));
-    const hasPlatform = platforms.some(platform => lower.includes(platform));
-
-    // It's a specific search if:
-    // - Contains "mejores/top" + platform (e.g., "mejores series de netflix")
-    // - Contains "qué ver en" + platform
-    // - Contains specific request patterns
-    return (hasSpecificPattern && hasPlatform) || 
-           (lower.includes('qué ver') || lower.includes('que ver')) ||
-           lower.includes('muéstrame') ||
-           lower.includes('muestrame');
   }
 
   private deduplicateCandidates(candidates: any[]): any[] {
@@ -578,8 +534,7 @@ Si ninguno coincide bien, responde con "NINGUNO".
   private async saveRecommendations(
     scoredRecs: any[],
     userId: string,
-    excludeIds: Set<number>,
-    isSpecificSearch: boolean = false
+    excludeIds: Set<number>
   ): Promise<Array<{ entity: Recommendation; score: number }>> {
     const results: Array<{ entity: Recommendation; score: number }> = [];
     const savedIds = new Set<number>(); // Track what we save in this batch
@@ -593,28 +548,26 @@ Si ninguno coincide bien, responde con "NINGUNO".
         continue;
       }
 
-      // Save to TMDB cache if new
-      if (!excludeIds.has(item.id)) {
-        try {
-          await this.tmdbRepository.save(
-            new Tmdb(
-              item.id,
-              item.title,
-              new Date(),
-              item.posterUrl ?? undefined,
-              item.overview ?? undefined,
-              item.releaseDate ? new Date(item.releaseDate) : undefined,
-              item.genreIds || [],
-              item.popularity || 0,
-              item.voteAverage || 0,
-              item.mediaType || 'movie',
-              item.platforms ?? [],
-              item.trailerUrl ?? undefined,
-            )
-          );
-        } catch (error) {
-          console.log(`⚠️  TMDB cache save failed (may already exist): ${item.title}`);
-        }
+      // Save to TMDB cache
+      try {
+        await this.tmdbRepository.save(
+          new Tmdb(
+            item.id,
+            item.title,
+            new Date(),
+            item.posterUrl ?? undefined,
+            item.overview ?? undefined,
+            item.releaseDate ? new Date(item.releaseDate) : undefined,
+            item.genreIds || [],
+            item.popularity || 0,
+            item.voteAverage || 0,
+            item.mediaType || 'movie',
+            item.platforms ?? [],
+            item.trailerUrl ?? undefined,
+          )
+        );
+      } catch (error) {
+        // Already exists, that's fine
       }
 
       // Create recommendation with intelligent reason
@@ -631,36 +584,27 @@ Si ninguno coincide bien, responde con "NINGUNO".
         item,
       );
 
-      // For specific searches, don't save to DB (just return results)
-      // For general recommendations, save only if new
-      if (isSpecificSearch) {
-        console.log(`🔍 Search result (not saving): ${item.title} (ID: ${item.id})`);
-        results.push({ entity: recEntity, score: scored.score });
-      } else if (!excludeIds.has(item.id)) {
-        // General recommendation - save if new
-        try {
-          await this.recommendationRepo.save(recEntity);
-          await this.activityLogRepo.log(
-            new ActivityLog(
-              undefined,
-              userId,
-              'recommended',
-              item.id,
-              reason,
-              new Date(),
-            )
-          );
-          savedIds.add(item.id);
-          console.log(`✅ Saved recommendation: ${item.title} (ID: ${item.id})`);
-          results.push({ entity: recEntity, score: scored.score });
-        } catch (error) {
-          console.error(`❌ Failed to save recommendation ${item.title}:`, error.message);
-          // Skip this one but continue with others
-          continue;
-        }
-      } else {
-        console.log(`⏭️  Not saving (already recommended): ${item.title}`);
+      // Try to save - if it fails due to duplicate, just include in response anyway
+      try {
+        await this.recommendationRepo.save(recEntity);
+        await this.activityLogRepo.log(
+          new ActivityLog(
+            undefined,
+            userId,
+            'recommended',
+            item.id,
+            reason,
+            new Date(),
+          )
+        );
+        savedIds.add(item.id);
+        console.log(`✅ Saved recommendation: ${item.title} (ID: ${item.id})`);
+      } catch (error) {
+        // Duplicate - that's OK, still include in response
+        console.log(`🔄 Re-recommendation: ${item.title} (ID: ${item.id})`);
       }
+
+      results.push({ entity: recEntity, score: scored.score });
     }
 
     return results;

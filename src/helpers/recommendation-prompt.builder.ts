@@ -174,15 +174,26 @@ export class RecommendationPromptBuilder {
   private buildHistorySection(): string {
     const sections: string[] = [];
 
-    // High-rated items (4+ stars)
+    // High-rated items (4+ stars) - MOST IMPORTANT
     const highRated = this.ratings
       .filter(r => r.rating >= 4)
+      .slice(-8)
+      .map(r => `${r.tmdb?.title} (⭐${r.rating}/5)`)
+      .filter(Boolean);
+
+    if (highRated.length > 0) {
+      sections.push(`✅ LE ENCANTARON (recomienda similar):\n${highRated.join(', ')}`);
+    }
+
+    // Low-rated items (3 or less) - AVOID SIMILAR
+    const lowRated = this.ratings
+      .filter(r => r.rating <= 3)
       .slice(-5)
       .map(r => `${r.tmdb?.title} (${r.rating}/5)`)
       .filter(Boolean);
 
-    if (highRated.length > 0) {
-      sections.push(`Títulos mejor valorados:\n${highRated.join(', ')}`);
+    if (lowRated.length > 0) {
+      sections.push(`❌ NO le gustaron (evita similar):\n${lowRated.join(', ')}`);
     }
 
     // Favorites
@@ -192,7 +203,7 @@ export class RecommendationPromptBuilder {
       .filter(Boolean);
 
     if (favTitles.length > 0) {
-      sections.push(`Favoritos recientes:\n${favTitles.join(', ')}`);
+      sections.push(`❤️ Favoritos:\n${favTitles.join(', ')}`);
     }
 
     // Wishlist
@@ -202,17 +213,17 @@ export class RecommendationPromptBuilder {
       .filter(Boolean);
 
     if (wishTitles.length > 0) {
-      sections.push(`En lista de deseos:\n${wishTitles.join(', ')}`);
+      sections.push(`📝 En lista de deseos:\n${wishTitles.join(', ')}`);
     }
 
-    // Recently seen
+    // Recently seen (to avoid recommending again immediately)
     const seenTitles = this.seenItems
-      .slice(-8)
+      .slice(-5)
       .map(s => s.tmdb?.title)
       .filter(Boolean);
 
     if (seenTitles.length > 0) {
-      sections.push(`Vistos recientemente:\n${seenTitles.join(', ')}`);
+      sections.push(`👁️ Ya vio:\n${seenTitles.join(', ')}`);
     }
 
     return sections.length > 0 ? sections.join('\n\n') : 'Sin historial previo';
@@ -221,31 +232,26 @@ export class RecommendationPromptBuilder {
   private buildConstraintsSection(): string {
     const constraints: string[] = [];
 
-    constraints.push('1. Genera EXACTAMENTE 5 recomendaciones DIFERENTES');
-    constraints.push('2. NO repitas títulos que el usuario ya haya visto, marcado como favorito o estén en su wishlist');
+    constraints.push('1. Genera EXACTAMENTE 5 recomendaciones de ALTA CALIDAD');
+    constraints.push('2. PRIORIZA títulos similares a los que le ENCANTARON (⭐4-5)');
+    constraints.push('3. EVITA títulos similares a los que NO le gustaron (❌)');
+    constraints.push('4. NO repitas títulos que ya vio (👁️)');
     
     if (this.recentRecs.length > 0) {
-      const recentTitles = this.recentRecs
-        .slice(-20) // Aumentado de 10 a 20 para evitar más repeticiones
+      const veryRecentTitles = this.recentRecs
+        .slice(-5) // Solo las últimas 5
         .map(r => r.tmdb?.title)
         .filter(Boolean)
         .join(', ');
-      constraints.push(`3. CRÍTICO: NO repitas NINGUNA de estas recomendaciones previas: ${recentTitles}`);
-      
-      // Extra warning for power users
-      if (this.recentRecs.length > 50) {
-        constraints.push('   ⚠️ Este usuario tiene MUCHAS recomendaciones previas. Busca títulos MÁS ESPECÍFICOS y MENOS CONOCIDOS.');
-      }
+      constraints.push(`5. Evita recomendar de nuevo (muy reciente): ${veryRecentTitles}`);
     }
 
-    constraints.push('4. Prioriza títulos de calidad reconocida (crítica o audiencia)');
-    constraints.push('5. Balancea entre títulos populares y joyas ocultas');
-    constraints.push('6. IMPORTANTE: Incluye un MIX de películas Y series (al menos 2 de cada tipo si es posible)');
-    constraints.push('7. SÉ CREATIVO: Busca títulos menos obvios pero de alta calidad');
+    constraints.push('6. Balancea entre títulos populares y joyas ocultas');
+    constraints.push('7. Incluye un MIX de películas Y series (al menos 2 de cada tipo)');
+    constraints.push('8. Prioriza VARIEDAD - diferentes géneros, épocas, estilos');
     
     if (this.feedback) {
-      constraints.push('8. IMPORTANTE: Las recomendaciones deben estar directamente relacionadas con la solicitud del usuario');
-      constraints.push('9. Si el usuario pide un tema específico (ej: informática, tecnología), TODAS las recomendaciones deben ser sobre ese tema');
+      constraints.push('9. CRÍTICO: Las recomendaciones deben coincidir con la solicitud del usuario');
     }
 
     return constraints.join('\n');
