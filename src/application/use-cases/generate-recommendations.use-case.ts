@@ -93,12 +93,11 @@ export class GenerateRecommendationsUseCase {
     }
 
     // 4) Search and score all candidates
-    // Only exclude recent recommendations (last 30), not all history
-    const recentCount = 30;
-    const recentRecsForExclusion = allRecs.slice(-recentCount);
-    const allPrevIds = new Set(recentRecsForExclusion.map(r => r.tmdbId));
+    // Exclude ALL recommendations to avoid DB constraint errors
+    // We'll allow re-recommendations only in the fallback if needed
+    const allPrevIds = new Set(allRecs.map(r => r.tmdbId));
     
-    console.log(`📋 Excluding ${allPrevIds.size} recent recommendations (from last ${recentCount})`);
+    console.log(`📋 Excluding ${allPrevIds.size} previously recommended titles`);
     
     let candidates = await this.searchAndScoreCandidates(
       aiTitles,
@@ -202,23 +201,23 @@ export class GenerateRecommendationsUseCase {
       console.log(`✅ Total candidates after trending: ${candidates.length}`);
     }
 
-    // 6) Last resort: if still not enough, allow re-recommendations from much older ones
-    if (candidates.length < 5) {
+    // 6) Last resort: if still not enough, allow re-recommendations from older ones (50+ recommendations ago)
+    if (candidates.length < 3) {
       console.log(`⚠️ Still only ${candidates.length} candidates, allowing re-recommendations from much older items...`);
       
-      // Get much older recommendations (not in recent 30)
-      const olderRecs = allRecs
-        .filter(r => !recentRecsForExclusion.some(recent => recent.tmdbId === r.tmdbId))
-        .slice(-20); // Last 20 older recommendations
+      // Get much older recommendations (not in recent 50)
+      const recentCutoff = 50;
+      const veryOldRecs = allRecs.slice(0, -recentCutoff); // Everything except last 50
       
-      if (olderRecs.length > 0) {
-        console.log(`📚 Found ${olderRecs.length} older recommendations to consider`);
-        const olderTitles = olderRecs
+      if (veryOldRecs.length > 0) {
+        console.log(`📚 Found ${veryOldRecs.length} very old recommendations to consider`);
+        const olderTitles = veryOldRecs
+          .slice(-20) // Take last 20 of the old ones
           .map(r => r.tmdb?.title)
           .filter(Boolean) as string[];
         
         const olderCandidates = await this.searchAndScoreCandidates(
-          olderTitles.slice(0, 10),
+          olderTitles,
           user,
           favorites,
           ratings,
@@ -226,9 +225,9 @@ export class GenerateRecommendationsUseCase {
         );
         
         candidates.push(...olderCandidates);
-        console.log(`✅ Added ${olderCandidates.length} candidates from older recommendations`);
+        console.log(`✅ Added ${olderCandidates.length} candidates from very old recommendations`);
       } else {
-        console.log(`⚠️ No older recommendations available`);
+        console.log(`⚠️ No old recommendations available (user has < ${recentCutoff} total recommendations)`);
       }
     }
 
@@ -519,6 +518,11 @@ export class GenerateRecommendationsUseCase {
       } catch (error) {
         console.warn(`⚠️  Invalid release date for ${rd.title}:`, rd.releaseDate);
         release = undefined;
+      }
+
+      // Log trailer status for debugging
+      if (!rd.trailerUrl) {
+        console.log(`⚠️  No trailer available for: ${rd.title} (ID: ${rec.tmdbId})`);
       }
 
       return {

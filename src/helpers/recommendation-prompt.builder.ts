@@ -121,15 +121,17 @@ export class RecommendationPromptBuilder {
       prefs.avgRating = sum / this.ratings.length;
     }
 
-    // Detect preferred media type
+    // Detect preferred media type - but be more conservative
     const movieCount = this.favorites.filter(f => f.tmdb?.mediaType === 'movie').length;
     const seriesCount = this.favorites.filter(f => f.tmdb?.mediaType === 'tv').length;
     
-    if (movieCount > seriesCount * 1.5) {
+    // Only set preference if there's a STRONG bias (2x or more)
+    if (movieCount > seriesCount * 2) {
       prefs.preferredMediaType = 'movie';
-    } else if (seriesCount > movieCount * 1.5) {
+    } else if (seriesCount > movieCount * 2) {
       prefs.preferredMediaType = 'series';
     } else {
+      // Default to both for balanced recommendations
       prefs.preferredMediaType = 'both';
     }
 
@@ -152,9 +154,13 @@ export class RecommendationPromptBuilder {
       lines.push(`- Estándares de calidad: ${standard} (promedio: ${prefs.avgRating.toFixed(1)}/5)`);
     }
 
-    if (prefs.preferredMediaType !== 'both') {
-      const type = prefs.preferredMediaType === 'movie' ? 'películas' : 'series';
-      lines.push(`- Preferencia: ${type}`);
+    // Only show preference if it's strong (not 'both')
+    if (prefs.preferredMediaType === 'movie') {
+      lines.push(`- Preferencia marcada: películas (pero también considera series)`);
+    } else if (prefs.preferredMediaType === 'series') {
+      lines.push(`- Preferencia marcada: series (pero también considera películas)`);
+    } else {
+      lines.push(`- Le gustan tanto películas como series por igual`);
     }
 
     return lines.length > 0 ? lines.join('\n') : '- Sin preferencias definidas aún';
@@ -224,7 +230,7 @@ export class RecommendationPromptBuilder {
 
     constraints.push('4. Prioriza títulos de calidad reconocida (crítica o audiencia)');
     constraints.push('5. Balancea entre títulos populares y joyas ocultas');
-    constraints.push('6. Considera tanto películas como series, a menos que el usuario tenga preferencia clara');
+    constraints.push('6. IMPORTANTE: Incluye un MIX de películas Y series (al menos 2 de cada tipo si es posible)');
     constraints.push('7. SÉ CREATIVO: Busca títulos menos obvios pero de alta calidad');
     
     if (this.feedback) {

@@ -127,17 +127,41 @@ export class TmdbService {
     const url = `${this.baseUrl}/${type}/${id}/videos`;
 
     try {
-      const { data } = await this.http.axiosRef.get(url, {
+      // Try Spanish first
+      let { data } = await this.http.axiosRef.get(url, {
         params: { api_key: this.apiKey, language: 'es-ES' },
       });
 
-      const trailer = data.results.find(
+      let trailer = data.results.find(
         (v) => v.type === 'Trailer' && v.site === 'YouTube'
       );
 
-      return trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : undefined;
+      // If no Spanish trailer, try English
+      if (!trailer) {
+        const response = await this.http.axiosRef.get(url, {
+          params: { api_key: this.apiKey, language: 'en-US' },
+        });
+        data = response.data;
+        trailer = data.results.find(
+          (v) => v.type === 'Trailer' && v.site === 'YouTube'
+        );
+      }
+
+      // If still no trailer, try any language
+      if (!trailer && data.results.length > 0) {
+        trailer = data.results.find((v) => v.site === 'YouTube');
+      }
+
+      if (trailer) {
+        const trailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
+        console.log(`🎬 Trailer found for ${type} ${id}: ${trailerUrl}`);
+        return trailerUrl;
+      } else {
+        console.log(`⚠️  No trailer found for ${type} ${id}`);
+        return undefined;
+      }
     } catch (error) {
-      console.error(`Error al obtener trailer para ${type} ${id}:`, error.message);
+      console.error(`❌ Error al obtener trailer para ${type} ${id}:`, error.message);
       return undefined;
     }
   }
