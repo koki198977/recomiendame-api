@@ -57,66 +57,48 @@ export class RecommendationPromptBuilder {
   }
 
   build(): string {
-    const preferences = this.analyzePreferences();
     const sections: string[] = [];
 
-    // System role
-    sections.push(
-      'Eres un experto recomendador de películas y series con profundo conocimiento cinematográfico.'
-    );
-    sections.push('Tu objetivo es generar recomendaciones personalizadas y relevantes.\n');
-
-    // User context
+    // Si hay feedback del usuario, ESO es lo principal
     if (this.feedback) {
-      const isObjectiveQuery = this.isObjectiveQuery(this.feedback);
-      
       sections.push('## SOLICITUD DEL USUARIO');
       sections.push(this.feedback);
       sections.push('');
+    } else {
+      // Solo si no hay feedback, usar el enfoque tradicional
+      sections.push('Recomienda películas y series de alta calidad basándote en el perfil del usuario.\n');
       
-      if (isObjectiveQuery) {
-        sections.push('⚠️ IMPORTANTE: Esta es una solicitud OBJETIVA (mejores, top, clásicos).');
-        sections.push('Prioriza CALIDAD UNIVERSAL y RECONOCIMIENTO CRÍTICO sobre las preferencias personales.');
-        sections.push('Puedes incluir títulos que el usuario ya conoce si son realmente los mejores.');
-      } else {
-        sections.push('⚠️ CRÍTICO: Esta solicitud es LO MÁS IMPORTANTE. TODAS las recomendaciones deben estar directamente relacionadas.');
-        sections.push('- Si pide "humor" o "comedia" → SOLO comedias');
-        sections.push('- Si pide "tipo Dark" → Series/películas con misterio, ciencia ficción, viajes en el tiempo');
-        sections.push('- Si pide "informática" → Contenido sobre tecnología, hackers, programación');
-        sections.push('- Si pide "terror" → SOLO contenido de terror/horror');
-      }
+      const preferences = this.analyzePreferences();
+      sections.push('## PERFIL DEL USUARIO');
+      sections.push(this.buildPreferencesSection(preferences));
+      sections.push('\n## HISTORIAL DEL USUARIO');
+      sections.push(this.buildHistorySection());
+    }
+
+    // Restricciones mínimas
+    sections.push('## RESTRICCIONES');
+    
+    // Excluir wishlist (ya los conoce)
+    const wishTitles = this.wishlist
+      .map(w => w.tmdb?.title)
+      .filter(Boolean);
+
+    if (wishTitles.length > 0) {
+      sections.push(`NO recomiendes estos títulos (ya están en su lista de deseos):`);
+      sections.push(wishTitles.join(', '));
       sections.push('');
     }
 
-    // Preferences analysis
-    sections.push('## PERFIL DEL USUARIO');
-    sections.push(this.buildPreferencesSection(preferences));
-
-    // User history
-    sections.push('\n## HISTORIAL DEL USUARIO');
-    sections.push(this.buildHistorySection());
-
-    // Constraints
-    sections.push('\n## RESTRICCIONES');
-    sections.push(this.buildConstraintsSection());
-
-    // Output format - MÁS EXPLÍCITO
-    sections.push('\n## FORMATO DE RESPUESTA OBLIGATORIO');
-    sections.push('Debes responder con EXACTAMENTE 5 títulos de películas o series.');
-    sections.push('Formato: Un título por línea, sin números, sin guiones, sin descripciones.');
+    // Formato de respuesta
+    sections.push('## FORMATO DE RESPUESTA');
+    sections.push('Responde con EXACTAMENTE 5 títulos, uno por línea, sin números ni descripciones.');
     sections.push('');
-    sections.push('Ejemplo correcto:');
+    sections.push('Ejemplo:');
     sections.push('The Shawshank Redemption');
     sections.push('Breaking Bad');
     sections.push('Inception');
     sections.push('The Wire');
     sections.push('Parasite');
-    sections.push('');
-    sections.push('NO hagas esto:');
-    sections.push('1. The Shawshank Redemption - Una historia sobre...');
-    sections.push('- Breaking Bad (Serie de drama)');
-    sections.push('');
-    sections.push('RESPONDE AHORA CON 5 TÍTULOS:');
 
     return sections.join('\n');
   }
