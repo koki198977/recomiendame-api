@@ -68,16 +68,23 @@ export class RecommendationPromptBuilder {
 
     // User context
     if (this.feedback) {
-      sections.push('## SOLICITUD ESPECÍFICA DEL USUARIO (MÁXIMA PRIORIDAD)');
+      const isObjectiveQuery = this.isObjectiveQuery(this.feedback);
+      
+      sections.push('## SOLICITUD DEL USUARIO');
       sections.push(this.feedback);
       sections.push('');
-      sections.push('⚠️ CRÍTICO: Esta solicitud es LO MÁS IMPORTANTE. TODAS las recomendaciones deben estar directamente relacionadas.');
-      sections.push('- Si pide "humor" o "comedia" → SOLO comedias');
-      sections.push('- Si pide "tipo Dark" → Series/películas con misterio, ciencia ficción, viajes en el tiempo');
-      sections.push('- Si pide "informática" → Contenido sobre tecnología, hackers, programación');
-      sections.push('- Si pide "terror" → SOLO contenido de terror/horror');
-      sections.push('');
-      sections.push('NO ignores esta solicitud. NO recomiendes contenido que no coincida con lo pedido.');
+      
+      if (isObjectiveQuery) {
+        sections.push('⚠️ IMPORTANTE: Esta es una solicitud OBJETIVA (mejores, top, clásicos).');
+        sections.push('Prioriza CALIDAD UNIVERSAL y RECONOCIMIENTO CRÍTICO sobre las preferencias personales.');
+        sections.push('Puedes incluir títulos que el usuario ya conoce si son realmente los mejores.');
+      } else {
+        sections.push('⚠️ CRÍTICO: Esta solicitud es LO MÁS IMPORTANTE. TODAS las recomendaciones deben estar directamente relacionadas.');
+        sections.push('- Si pide "humor" o "comedia" → SOLO comedias');
+        sections.push('- Si pide "tipo Dark" → Series/películas con misterio, ciencia ficción, viajes en el tiempo');
+        sections.push('- Si pide "informática" → Contenido sobre tecnología, hackers, programación');
+        sections.push('- Si pide "terror" → SOLO contenido de terror/horror');
+      }
       sections.push('');
     }
 
@@ -112,6 +119,30 @@ export class RecommendationPromptBuilder {
     sections.push('RESPONDE AHORA CON 5 TÍTULOS:');
 
     return sections.join('\n');
+  }
+
+  private isObjectiveQuery(feedback: string): boolean {
+    const lower = feedback.toLowerCase();
+    
+    // Patterns that indicate objective/universal queries
+    const objectivePatterns = [
+      'mejores de todos los tiempos',
+      'mejores películas de la historia',
+      'mejores series de la historia',
+      'clásicos',
+      'obras maestras',
+      'imprescindibles',
+      'películas que hay que ver',
+      'series que hay que ver',
+      'top películas',
+      'top series',
+      'más aclamadas',
+      'mejor valoradas',
+      'ganadoras de oscar',
+      'ganadoras de emmy',
+    ];
+
+    return objectivePatterns.some(pattern => lower.includes(pattern));
   }
 
   private analyzePreferences(): UserPreferences {
@@ -231,28 +262,38 @@ export class RecommendationPromptBuilder {
 
   private buildConstraintsSection(): string {
     const constraints: string[] = [];
+    const isObjective = this.feedback ? this.isObjectiveQuery(this.feedback) : false;
 
     constraints.push('1. Genera EXACTAMENTE 5 recomendaciones de ALTA CALIDAD');
-    constraints.push('2. PRIORIZA títulos similares a los que le ENCANTARON (⭐4-5)');
-    constraints.push('3. EVITA títulos similares a los que NO le gustaron (❌)');
-    constraints.push('4. NO repitas títulos que ya vio (👁️)');
-    constraints.push('5. NO recomiendes títulos que ya están en su lista de deseos (📝) - ya los conoce');
     
-    if (this.recentRecs.length > 0) {
-      const veryRecentTitles = this.recentRecs
-        .slice(-5) // Solo las últimas 5
-        .map(r => r.tmdb?.title)
-        .filter(Boolean)
-        .join(', ');
-      constraints.push(`6. Evita recomendar de nuevo (muy reciente): ${veryRecentTitles}`);
-    }
+    if (isObjective) {
+      // Para consultas objetivas (mejores de todos los tiempos, etc.)
+      constraints.push('2. PRIORIZA reconocimiento crítico universal y calidad objetiva');
+      constraints.push('3. Incluye clásicos y títulos icónicos aunque el usuario ya los conozca');
+      constraints.push('4. Balancea entre diferentes épocas y estilos');
+    } else {
+      // Para recomendaciones personalizadas
+      constraints.push('2. PRIORIZA títulos similares a los que le ENCANTARON (⭐4-5)');
+      constraints.push('3. EVITA títulos similares a los que NO le gustaron (❌)');
+      constraints.push('4. NO repitas títulos que ya vio (👁️)');
+      constraints.push('5. NO recomiendes títulos que ya están en su lista de deseos (📝) - ya los conoce');
+      
+      if (this.recentRecs.length > 0) {
+        const veryRecentTitles = this.recentRecs
+          .slice(-5)
+          .map(r => r.tmdb?.title)
+          .filter(Boolean)
+          .join(', ');
+        constraints.push(`6. Evita recomendar de nuevo (muy reciente): ${veryRecentTitles}`);
+      }
 
-    constraints.push('7. Balancea entre títulos populares y joyas ocultas');
-    constraints.push('8. Incluye un MIX de películas Y series (al menos 2 de cada tipo)');
-    constraints.push('9. Prioriza VARIEDAD - diferentes géneros, épocas, estilos');
+      constraints.push('7. Balancea entre títulos populares y joyas ocultas');
+      constraints.push('8. Incluye un MIX de películas Y series (al menos 2 de cada tipo)');
+      constraints.push('9. Prioriza VARIEDAD - diferentes géneros, épocas, estilos');
+    }
     
     if (this.feedback) {
-      constraints.push('10. CRÍTICO: Las recomendaciones deben coincidir con la solicitud del usuario');
+      constraints.push(`${isObjective ? '5' : '10'}. CRÍTICO: Las recomendaciones deben coincidir con la solicitud del usuario`);
     }
 
     return constraints.join('\n');
