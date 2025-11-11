@@ -122,27 +122,33 @@ export class RecommendationPromptBuilder {
   }
 
   private isObjectiveQuery(feedback: string): boolean {
-    const lower = feedback.toLowerCase();
+    const lower = feedback.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Remove accents
     
     // Patterns that indicate objective/universal queries
     const objectivePatterns = [
-      'mejores de todos los tiempos',
-      'mejores películas de la historia',
-      'mejores series de la historia',
-      'clásicos',
+      'mejores.*todos los tiempos',
+      'mejores.*historia',
+      'mejores peliculas',
+      'mejores series',
+      'top.*peliculas',
+      'top.*series',
+      'clasicos',
       'obras maestras',
       'imprescindibles',
-      'películas que hay que ver',
-      'series que hay que ver',
-      'top películas',
-      'top series',
-      'más aclamadas',
+      'que hay que ver',
+      'mas aclamadas',
       'mejor valoradas',
       'ganadoras de oscar',
       'ganadoras de emmy',
+      'peliculas legendarias',
+      'series legendarias',
     ];
 
-    return objectivePatterns.some(pattern => lower.includes(pattern));
+    return objectivePatterns.some(pattern => {
+      const regex = new RegExp(pattern, 'i');
+      return regex.test(lower);
+    });
   }
 
   private analyzePreferences(): UserPreferences {
