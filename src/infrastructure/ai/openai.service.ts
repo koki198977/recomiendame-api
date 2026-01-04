@@ -18,7 +18,7 @@ export class OpenAiService {
       messages: [
         {
           role: 'system',
-          content: 'Eres un recomendador experto de películas y series. Siempre respondes con exactamente 5 títulos DIFERENTES y VARIADOS, uno por línea, sin numeración ni descripciones. Evita recomendar siempre los mismos títulos populares.',
+          content: 'Eres un recomendador experto de películas y series. Siempre respondes con exactamente 8 títulos DIFERENTES y VARIADOS, uno por línea, sin numeración ni descripciones. Evita recomendar siempre los mismos títulos populares.',
         },
         {
           role: 'user',

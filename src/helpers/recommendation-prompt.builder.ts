@@ -64,6 +64,50 @@ export class RecommendationPromptBuilder {
       sections.push('## SOLICITUD DEL USUARIO');
       sections.push(this.feedback);
       sections.push('');
+
+      // Analizar la solicitud para extraer criterios específicos
+      const criteria = this.extractCriteria(this.feedback);
+      if (criteria.hasSpecificCriteria) {
+        sections.push('⚠️ CRÍTICO: DEBES CUMPLIR EXACTAMENTE CON ESTOS CRITERIOS:');
+        
+        if (criteria.year) {
+          sections.push(`- AÑO: Solo películas/series del año ${criteria.year}`);
+        }
+        
+        if (criteria.yearRange) {
+          sections.push(`- PERÍODO: Solo películas/series de ${criteria.yearRange}`);
+        }
+        
+        if (criteria.genre) {
+          sections.push(`- GÉNERO: Solo del género ${criteria.genre}`);
+        }
+        
+        if (criteria.mediaType) {
+          sections.push(`- TIPO: Solo ${criteria.mediaType}`);
+        }
+        
+        if (criteria.platform) {
+          sections.push(`- PLATAFORMA: Solo disponibles en ${criteria.platform}`);
+        }
+        
+        if (criteria.language) {
+          sections.push(`- IDIOMA: Solo en ${criteria.language}`);
+        }
+        
+        sections.push('');
+        sections.push('🚨 NO IGNORES ESTOS CRITERIOS. Si no hay suficiente contenido que cumpla exactamente, di "No hay suficientes títulos que cumplan estos criterios específicos"');
+        sections.push('');
+      }
+
+      // Detectar si es una consulta objetiva (mejores de todos los tiempos, etc.)
+      const isObjective = this.isObjectiveQuery(this.feedback);
+      if (isObjective && !criteria.hasSpecificCriteria) {
+        sections.push('⚠️ IMPORTANTE: Esta es una consulta OBJETIVA.');
+        sections.push('Debes responder con las películas/series MÁS ICÓNICAS, LEGENDARIAS y ACLAMADAS UNIVERSALMENTE.');
+        sections.push('Piensa en: The Godfather, The Shawshank Redemption, Breaking Bad, The Wire, etc.');
+        sections.push('NO des películas "buenas" - da las MEJORES DE LA HISTORIA según crítica y audiencia.');
+        sections.push('');
+      }
     } else {
       // Solo si no hay feedback, usar el enfoque tradicional
       sections.push('Recomienda películas y series de alta calidad basándote en el perfil del usuario.\n');
@@ -91,7 +135,7 @@ export class RecommendationPromptBuilder {
 
     // Formato de respuesta
     sections.push('## FORMATO DE RESPUESTA');
-    sections.push('Responde con EXACTAMENTE 5 títulos, uno por línea, sin números ni descripciones.');
+    sections.push('Responde con EXACTAMENTE 8 títulos, uno por línea, sin números ni descripciones.');
     sections.push('');
     sections.push('Ejemplo:');
     sections.push('The Shawshank Redemption');
@@ -99,8 +143,119 @@ export class RecommendationPromptBuilder {
     sections.push('Inception');
     sections.push('The Wire');
     sections.push('Parasite');
+    sections.push('The Dark Knight');
+    sections.push('Game of Thrones');
+    sections.push('Pulp Fiction');
 
     return sections.join('\n');
+  }
+
+  private extractCriteria(feedback: string): {
+    hasSpecificCriteria: boolean;
+    year?: string;
+    yearRange?: string;
+    genre?: string;
+    mediaType?: string;
+    platform?: string;
+    language?: string;
+  } {
+    const lower = feedback.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Remove accents
+    
+    const criteria: any = { hasSpecificCriteria: false };
+
+    // Detectar año específico (2020, 2021, 2022, etc.)
+    const yearMatch = lower.match(/\b(20\d{2}|19\d{2})\b/);
+    if (yearMatch) {
+      criteria.year = yearMatch[1];
+      criteria.hasSpecificCriteria = true;
+    }
+
+    // Detectar rangos de años (2020-2023, años 90, década de los 80, etc.)
+    const decadePatterns = [
+      { pattern: /años?\s*90|decada\s*de\s*los?\s*90|90s?/, range: '1990-1999' },
+      { pattern: /años?\s*80|decada\s*de\s*los?\s*80|80s?/, range: '1980-1989' },
+      { pattern: /años?\s*2000|decada\s*de\s*los?\s*2000|2000s?/, range: '2000-2009' },
+      { pattern: /años?\s*2010|decada\s*de\s*los?\s*2010|2010s?/, range: '2010-2019' },
+      { pattern: /años?\s*2020|decada\s*de\s*los?\s*2020|2020s?/, range: '2020-2029' },
+    ];
+
+    for (const { pattern, range } of decadePatterns) {
+      if (pattern.test(lower)) {
+        criteria.yearRange = range;
+        criteria.hasSpecificCriteria = true;
+        break;
+      }
+    }
+
+    // Detectar géneros específicos
+    const genrePatterns = [
+      { pattern: /\b(terror|horror|miedo)\b/, genre: 'terror' },
+      { pattern: /\b(comedia|comicas|graciosas|divertidas)\b/, genre: 'comedia' },
+      { pattern: /\b(accion|acción)\b/, genre: 'acción' },
+      { pattern: /\b(drama|dramaticas)\b/, genre: 'drama' },
+      { pattern: /\b(ciencia\s*ficcion|sci-?fi|futuristas)\b/, genre: 'ciencia ficción' },
+      { pattern: /\b(romance|romanticas|amor)\b/, genre: 'romance' },
+      { pattern: /\b(thriller|suspenso)\b/, genre: 'thriller' },
+      { pattern: /\b(animacion|animadas|anime)\b/, genre: 'animación' },
+      { pattern: /\b(documental|documentales)\b/, genre: 'documental' },
+      { pattern: /\b(fantasia|fantasticas|magicas)\b/, genre: 'fantasía' },
+      { pattern: /\b(crimen|criminales|policiacas)\b/, genre: 'crimen' },
+    ];
+
+    for (const { pattern, genre } of genrePatterns) {
+      if (pattern.test(lower)) {
+        criteria.genre = genre;
+        criteria.hasSpecificCriteria = true;
+        break;
+      }
+    }
+
+    // Detectar tipo de media específico
+    if (/\b(peliculas?|films?|movies?)\b/.test(lower) && !/\b(series?|shows?)\b/.test(lower)) {
+      criteria.mediaType = 'películas';
+      criteria.hasSpecificCriteria = true;
+    } else if (/\b(series?|shows?)\b/.test(lower) && !/\b(peliculas?|films?|movies?)\b/.test(lower)) {
+      criteria.mediaType = 'series';
+      criteria.hasSpecificCriteria = true;
+    }
+
+    // Detectar plataformas específicas
+    const platformPatterns = [
+      { pattern: /\b(netflix)\b/, platform: 'Netflix' },
+      { pattern: /\b(amazon\s*prime|prime\s*video)\b/, platform: 'Amazon Prime' },
+      { pattern: /\b(disney\s*plus|disney\+)\b/, platform: 'Disney+' },
+      { pattern: /\b(hbo\s*max|hbo)\b/, platform: 'HBO Max' },
+      { pattern: /\b(apple\s*tv)\b/, platform: 'Apple TV+' },
+    ];
+
+    for (const { pattern, platform } of platformPatterns) {
+      if (pattern.test(lower)) {
+        criteria.platform = platform;
+        criteria.hasSpecificCriteria = true;
+        break;
+      }
+    }
+
+    // Detectar idiomas específicos
+    const languagePatterns = [
+      { pattern: /\b(español|castellano|en\s*español)\b/, language: 'español' },
+      { pattern: /\b(ingles|english|en\s*ingles)\b/, language: 'inglés' },
+      { pattern: /\b(coreanas?|k-?dramas?|corea)\b/, language: 'coreano' },
+      { pattern: /\b(japonesas?|anime|japon)\b/, language: 'japonés' },
+      { pattern: /\b(francesas?|francia|frances)\b/, language: 'francés' },
+      { pattern: /\b(alemanas?|alemania|aleman)\b/, language: 'alemán' },
+    ];
+
+    for (const { pattern, language } of languagePatterns) {
+      if (pattern.test(lower)) {
+        criteria.language = language;
+        criteria.hasSpecificCriteria = true;
+        break;
+      }
+    }
+
+    return criteria;
   }
 
   private isObjectiveQuery(feedback: string): boolean {
@@ -165,9 +320,10 @@ export class RecommendationPromptBuilder {
   private buildPreferencesSection(prefs: UserPreferences): string {
     const lines: string[] = [];
 
-    if (prefs.favoriteGenres.length > 0) {
-      lines.push(`- Géneros favoritos: ${prefs.favoriteGenres.join(', ')}`);
-    }
+    // Comentamos los géneros favoritos para permitir más variedad
+    // if (prefs.favoriteGenres.length > 0) {
+    //   lines.push(`- Géneros favoritos: ${prefs.favoriteGenres.join(', ')}`);
+    // }
 
     if (prefs.favoriteMedia) {
       lines.push(`- Gustos declarados: ${prefs.favoriteMedia}`);
@@ -252,7 +408,7 @@ export class RecommendationPromptBuilder {
     const constraints: string[] = [];
     const isObjective = this.feedback ? this.isObjectiveQuery(this.feedback) : false;
 
-    constraints.push('1. Genera EXACTAMENTE 5 recomendaciones de ALTA CALIDAD');
+    constraints.push('1. Genera EXACTAMENTE 8 recomendaciones de ALTA CALIDAD');
     
     if (isObjective) {
       // Para consultas objetivas (mejores de todos los tiempos, etc.)

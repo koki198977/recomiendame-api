@@ -174,7 +174,7 @@ export class RecommendationScorer {
    */
   static selectBest(
     scored: ScoredRecommendation[],
-    count: number = 5
+    count: number = 8
   ): ScoredRecommendation[] {
     return scored
       .sort((a, b) => b.score - a.score)
@@ -186,7 +186,7 @@ export class RecommendationScorer {
    */
   static diversify(
     scored: ScoredRecommendation[],
-    count: number = 5
+    count: number = 8
   ): ScoredRecommendation[] {
     const selected: ScoredRecommendation[] = [];
     const usedGenres = new Set<number>();

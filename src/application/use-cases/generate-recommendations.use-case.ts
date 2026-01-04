@@ -86,7 +86,7 @@ export class GenerateRecommendationsUseCase {
     
     if (allAreDuplicates && aiTitles.length > 0) {
       console.log('⚠️ All AI titles are duplicates, regenerating with more creativity...');
-      const retryPrompt = prompt + '\n\nIMPORTANTE: Los títulos anteriores ya fueron recomendados. Genera 5 títulos COMPLETAMENTE DIFERENTES.';
+      const retryPrompt = prompt + '\n\nIMPORTANTE: Los títulos anteriores ya fueron recomendados. Genera 8 títulos COMPLETAMENTE DIFERENTES.';
       raw = await this.openAi.generate(retryPrompt);
       aiTitles = this.parseRecommendations(raw);
       console.log('🔄 Retry titles:', aiTitles);
@@ -114,7 +114,7 @@ export class GenerateRecommendationsUseCase {
       if (duplicateCount >= 3) {
         console.log(`⚠️ ${duplicateCount} of ${aiTitles.length} AI titles were duplicates. Regenerating with stricter instructions...`);
         
-        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN: Los siguientes títulos YA fueron recomendados, NO los repitas: ${aiTitles.join(', ')}\n\nGenera 5 títulos COMPLETAMENTE DIFERENTES que cumplan con la solicitud.`;
+        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN: Los siguientes títulos YA fueron recomendados, NO los repitas: ${aiTitles.join(', ')}\n\nGenera 8 títulos COMPLETAMENTE DIFERENTES que cumplan con la solicitud.`;
         
         const retryRaw = await this.openAi.generate(retryPrompt);
         const retryTitles = this.parseRecommendations(retryRaw);
@@ -212,10 +212,10 @@ export class GenerateRecommendationsUseCase {
     }
 
     // 5) If not enough, add trending items
-    if (candidates.length < 5) {
+    if (candidates.length < 8) {
       console.log(`⚠️ Only ${candidates.length} candidates, adding trending...`);
       const trendingCandidates = await this.addTrendingCandidates(
-        5 - candidates.length,
+        8 - candidates.length,
         user,
         favorites,
         ratings,
@@ -244,7 +244,7 @@ export class GenerateRecommendationsUseCase {
         user,
         favorites,
         ratings,
-        5 - uniqueCandidates.length
+        8 - uniqueCandidates.length
       );
       
       if (matchingOldRecs.length > 0) {
@@ -257,7 +257,7 @@ export class GenerateRecommendationsUseCase {
     if (uniqueCandidates.length < 3 && !feedback) {
       console.log(`⚠️ CRITICAL: Only ${uniqueCandidates.length} candidates, using trending...`);
       const emergencyTrending = await this.addTrendingCandidates(
-        5 - uniqueCandidates.length,
+        8 - uniqueCandidates.length,
         user,
         favorites,
         ratings,
@@ -268,7 +268,7 @@ export class GenerateRecommendationsUseCase {
     }
 
     // 9) Select best with diversity
-    const bestRecs = RecommendationScorer.diversify(uniqueCandidates, 5);
+    const bestRecs = RecommendationScorer.diversify(uniqueCandidates, 8);
 
     // 10) Ensure we have at least some recommendations
     if (bestRecs.length === 0) {

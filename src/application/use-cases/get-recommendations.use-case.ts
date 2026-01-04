@@ -10,7 +10,7 @@ export class GetRecommendationsUseCase {
   ) {}
 
   async execute(userId: string): Promise<RecommendationResponse[]> {
-    const recs = await this.recommendationRepo.findLatestByUser(userId, 5);
+    const recs = await this.recommendationRepo.findLatestByUser(userId, 8);
     return recs.map((r) => ({
       id:            r.id,
       tmdbId:        r.tmdbId,
