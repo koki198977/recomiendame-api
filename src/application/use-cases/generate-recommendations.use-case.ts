@@ -109,6 +109,42 @@ export class GenerateRecommendationsUseCase {
 
     console.log(`📊 Found ${candidates.length} candidates after scoring`);
 
+    // Si hay feedback con criterios específicos y muy pocos candidatos válidos, regenerar
+    if (feedback && candidates.length < 5) {
+      const lower = feedback.toLowerCase();
+      const hasYear = /\b(202[0-9]|201[0-9])\b/.test(lower);
+      const hasMediaType = /\b(series?|serie|shows?|show|peliculas?|pelicula|pelis?|peli|films?|film|movies?|movie)\b/.test(lower);
+      
+      if (hasYear || hasMediaType) {
+        console.log(`⚠️ Solo ${candidates.length} candidatos válidos con criterios específicos. Regenerando...`);
+        
+        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN CRÍTICA: Los títulos anteriores NO cumplieron con los criterios específicos del usuario.\n\nRECUERDA:\n- Si pidió un AÑO específico, SOLO títulos de ese año exacto\n- Si pidió SERIES, SOLO series (no películas)\n- Si pidió PELÍCULAS, SOLO películas (no series)\n\nGenera 8 títulos COMPLETAMENTE DIFERENTES que SÍ cumplan EXACTAMENTE con los criterios.`;
+        
+        const retryRaw = await this.openAi.generate(retryPrompt);
+        const retryTitles = this.parseRecommendations(retryRaw);
+        console.log('🔄 Retry with stricter criteria:', retryTitles);
+        
+        const retryCandidates = await this.searchAndScoreCandidates(
+          retryTitles,
+          user,
+          favorites,
+          ratings,
+          allPrevIds,
+          feedback
+        );
+        
+        // Reemplazar candidatos si el retry fue mejor
+        if (retryCandidates.length > candidates.length) {
+          candidates = retryCandidates;
+          console.log(`✅ Retry mejoró: ${retryCandidates.length} candidatos válidos`);
+        } else {
+          // Combinar ambos intentos
+          candidates.push(...retryCandidates);
+          console.log(`✅ Combinando intentos: ${candidates.length} candidatos totales`);
+        }
+      }
+    }
+
     // If very few candidates and we have feedback, try regenerating with more specific instructions
     if (candidates.length < 2 && feedback && aiTitles.length > 0) {
       const duplicateCount = aiTitles.length - candidates.length;

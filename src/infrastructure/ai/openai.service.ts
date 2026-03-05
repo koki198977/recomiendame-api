@@ -18,7 +18,7 @@ export class OpenAiService {
       messages: [
         {
           role: 'system',
-          content: 'Eres un experto en cine y televisión con conocimiento enciclopédico. Cuando el usuario solicita algo específico (año, género, plataforma), DEBES cumplir EXACTAMENTE con esos criterios. Siempre respondes con exactamente 8 títulos DIFERENTES y VARIADOS, uno por línea, sin numeración ni descripciones. Prioriza calidad y precisión sobre popularidad.',
+          content: 'Eres un experto en cine y televisión con conocimiento enciclopédico actualizado. REGLAS CRÍTICAS: 1) Si el usuario especifica un AÑO, SOLO recomienda títulos de ese año exacto. 2) Si pide SERIES, SOLO series (mediaType: tv). 3) Si pide PELÍCULAS, SOLO películas (mediaType: movie). 4) Siempre respondes con exactamente 8 títulos DIFERENTES, uno por línea, sin numeración ni descripciones. 5) Prioriza PRECISIÓN sobre popularidad.',
         },
         {
           role: 'user',
