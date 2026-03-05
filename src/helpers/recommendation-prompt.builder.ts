@@ -64,8 +64,59 @@ export class RecommendationPromptBuilder {
       sections.push('## SOLICITUD DEL USUARIO');
       sections.push(this.feedback);
       sections.push('');
-      sections.push('⚠️ IMPORTANTE: Responde EXACTAMENTE a lo que el usuario pidió.');
-      sections.push('No te limites por el historial del usuario. Enfócate en cumplir su solicitud.');
+      sections.push('🚨 CRÍTICO: Debes responder EXACTAMENTE a lo que el usuario pidió.');
+      sections.push('');
+      
+      // Detectar criterios específicos en el feedback
+      const lower = this.feedback.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Remove accents
+      
+      // Detectar año específico
+      const yearMatch = lower.match(/\b(202[0-9]|201[0-9])\b/);
+      if (yearMatch) {
+        sections.push(`⚠️ AÑO ESPECÍFICO: Solo títulos del año ${yearMatch[1]}`);
+        sections.push(`NO incluyas títulos de otros años (ni ${parseInt(yearMatch[1]) - 1}, ni ${parseInt(yearMatch[1]) + 1})`);
+        sections.push('');
+      }
+      
+      // Detectar tipo de contenido - MEJORADO con más variaciones
+      const seriesPatterns = [
+        /\bseries?\b/,
+        /\bserie\b/,
+        /\bshows?\b/,
+        /\bshow\b/,
+        /\btv\b/,
+        /\bteleserie/,
+        /\bminiserie/
+      ];
+      
+      const moviePatterns = [
+        /\bpeliculas?\b/,
+        /\bpelicula\b/,
+        /\bpelis?\b/,
+        /\bpeli\b/,
+        /\bfilms?\b/,
+        /\bfilm\b/,
+        /\bmovies?\b/,
+        /\bmovie\b/,
+        /\bcine\b/
+      ];
+      
+      const hasSeries = seriesPatterns.some(pattern => pattern.test(lower));
+      const hasMovies = moviePatterns.some(pattern => pattern.test(lower));
+      
+      // Solo marcar tipo si menciona uno pero no el otro
+      if (hasSeries && !hasMovies) {
+        sections.push('⚠️ TIPO: Solo SERIES (TV Shows)');
+        sections.push('NO incluyas películas');
+        sections.push('');
+      } else if (hasMovies && !hasSeries) {
+        sections.push('⚠️ TIPO: Solo PELÍCULAS');
+        sections.push('NO incluyas series');
+        sections.push('');
+      }
+      
+      sections.push('No te limites por el historial del usuario. Enfócate ÚNICAMENTE en cumplir estos criterios.');
       sections.push('');
     } else {
       // Solo si no hay feedback, usar el enfoque tradicional con análisis inteligente

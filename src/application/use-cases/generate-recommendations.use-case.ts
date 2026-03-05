@@ -103,7 +103,8 @@ export class GenerateRecommendationsUseCase {
       user,
       favorites,
       ratings,
-      allPrevIds
+      allPrevIds,
+      feedback // Pasar el feedback para filtrar
     );
 
     console.log(`📊 Found ${candidates.length} candidates after scoring`);
@@ -125,7 +126,8 @@ export class GenerateRecommendationsUseCase {
           user,
           favorites,
           ratings,
-          allPrevIds
+          allPrevIds,
+          feedback
         );
         
         candidates.push(...retryCandidates);
@@ -159,7 +161,8 @@ export class GenerateRecommendationsUseCase {
           user,
           favorites,
           ratings,
-          allPrevIds
+          allPrevIds,
+          feedback
         );
         candidates.push(...directCandidates);
         console.log(`✅ Added ${directCandidates.length} candidates from direct search`);
@@ -198,7 +201,8 @@ export class GenerateRecommendationsUseCase {
               user,
               favorites,
               ratings,
-              allPrevIds
+              allPrevIds,
+              feedback
             );
             candidates.push(...genreCandidates);
             console.log(`✅ Added ${genreCandidates.length} candidates from genre search "${term}"`);
@@ -396,7 +400,8 @@ Si ninguno coincide bien, responde con "NINGUNO".
     user: any,
     favorites: any[],
     ratings: any[],
-    excludeIds: Set<number>
+    excludeIds: Set<number>,
+    feedback?: string
   ) {
     const candidates: any[] = [];
     const seenIds = new Set<number>(); // Track IDs we've already added
@@ -404,12 +409,63 @@ Si ninguno coincide bien, responde con "NINGUNO".
       ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
       : 3.5;
 
-    // Detect preferred media type
+    // Extraer criterios del feedback si existe
+    let requiredYear: number | null = null;
+    let requiredMediaType: 'movie' | 'tv' | null = null;
+    
+    if (feedback) {
+      const lower = feedback.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Remove accents
+      
+      // Detectar año específico (2020-2029)
+      const yearMatch = lower.match(/\b(202[0-9]|201[0-9])\b/);
+      if (yearMatch) {
+        requiredYear = parseInt(yearMatch[1]);
+        console.log(`🎯 Filtering by year: ${requiredYear}`);
+      }
+      
+      // Detectar tipo de contenido - MEJORADO con más variaciones
+      const seriesPatterns = [
+        /\bseries?\b/,
+        /\bserie\b/,
+        /\bshows?\b/,
+        /\bshow\b/,
+        /\btv\b/,
+        /\bteleserie/,
+        /\bminiserie/
+      ];
+      
+      const moviePatterns = [
+        /\bpeliculas?\b/,
+        /\bpelicula\b/,
+        /\bpelis?\b/,
+        /\bpeli\b/,
+        /\bfilms?\b/,
+        /\bfilm\b/,
+        /\bmovies?\b/,
+        /\bmovie\b/,
+        /\bcine\b/
+      ];
+      
+      const hasSeries = seriesPatterns.some(pattern => pattern.test(lower));
+      const hasMovies = moviePatterns.some(pattern => pattern.test(lower));
+      
+      // Solo marcar tipo si menciona uno pero no el otro
+      if (hasSeries && !hasMovies) {
+        requiredMediaType = 'tv';
+        console.log(`🎯 Filtering by type: TV Series only`);
+      } else if (hasMovies && !hasSeries) {
+        requiredMediaType = 'movie';
+        console.log(`🎯 Filtering by type: Movies only`);
+      }
+    }
+
+    // Detect preferred media type (solo si no hay feedback)
     const movieCount = favorites.filter(f => f.tmdb?.mediaType === 'movie').length;
     const seriesCount = favorites.filter(f => f.tmdb?.mediaType === 'tv').length;
-    const preferredMediaType = movieCount > seriesCount * 1.5 
+    const preferredMediaType = !feedback && movieCount > seriesCount * 1.5 
       ? 'movie' 
-      : seriesCount > movieCount * 1.5 
+      : !feedback && seriesCount > movieCount * 1.5 
       ? 'tv' 
       : undefined;
 
@@ -426,7 +482,22 @@ Si ninguno coincide bien, responde con "NINGUNO".
         }
 
         const first = results[0];
-        console.log(`  ✅ Found: ${first.title} (ID: ${first.id})`);
+        const itemYear = first.releaseDate ? new Date(first.releaseDate).getFullYear() : null;
+        console.log(`  ✅ Found: ${first.title} (ID: ${first.id}, Type: ${first.mediaType}, Year: ${itemYear || 'unknown'})`);
+        
+        // Filtrar por año si es requerido
+        if (requiredYear && itemYear) {
+          if (itemYear !== requiredYear) {
+            console.log(`  ⏭️  Skipping (wrong year: ${itemYear}, required: ${requiredYear})`);
+            continue;
+          }
+        }
+        
+        // Filtrar por tipo de media si es requerido
+        if (requiredMediaType && first.mediaType !== requiredMediaType) {
+          console.log(`  ⏭️  Skipping (wrong type: ${first.mediaType}, required: ${requiredMediaType})`);
+          continue;
+        }
         
         if (excludeIds.has(first.id)) {
           console.log(`  ⏭️  Skipping (already recommended): ${first.title}`);
