@@ -31,6 +31,7 @@ model User {
   ActivityLog            ActivityLog[]
   wishListItems          WishListItem[]
   DeleteAccountToken     DeleteAccountToken[]
+  dislikedItems          DislikedItem[]
 }
 
 model EmailVerificationToken {
@@ -72,6 +73,7 @@ model Tmdb {
   recommendations Recommendation[]
   activityLogs    ActivityLog[]
   wishListItems   WishListItem[]
+  dislikedItems   DislikedItem[]
 }
 
 model SeenItem {
@@ -156,4 +158,17 @@ model DeleteAccountToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   expiresAt DateTime
+}
+
+model DislikedItem {
+  id        String   @id @default(cuid())
+  userId    String
+  tmdbId    Int
+  mediaType String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
+
+  @@unique([userId, tmdbId])
 }

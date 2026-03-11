@@ -65,6 +65,12 @@ import { RemoveFromWishListUseCase } from './application/use-cases/remove-from-w
 import { WISHLIST_REPOSITORY } from './application/ports/wishlist.repository';
 import { WishListRepositoryImpl } from './infrastructure/repositories/wishlist.repository';
 import { AdminGuard } from './infrastructure/auth/admin.guard';
+import { DislikedController } from './infrastructure/http/disliked.controller';
+import { AddDislikedUseCase } from './application/use-cases/add-disliked.use-case';
+import { GetDislikedUseCase } from './application/use-cases/get-disliked.use-case';
+import { RemoveDislikedUseCase } from './application/use-cases/remove-disliked.use-case';
+import { DISLIKED_REPOSITORY } from './application/ports/disliked.repository';
+import { DislikedRepositoryImpl } from './infrastructure/persistence/disliked.repository.impl';
 
 @Module({
   imports: [
@@ -77,7 +83,8 @@ import { AdminGuard } from './infrastructure/auth/admin.guard';
   ],
   controllers: [
     AppController, SeenController, UserController, FavoriteController, RatingController, 
-    RecommendationController, ActivityLogController, DashboardController, WishListController
+    RecommendationController, ActivityLogController, DashboardController, WishListController,
+    DislikedController
   ],
   providers: [
     OpenAiService,
@@ -142,6 +149,13 @@ import { AdminGuard } from './infrastructure/auth/admin.guard';
     {
       provide: WISHLIST_REPOSITORY,
       useClass: WishListRepositoryImpl,
+    },
+    AddDislikedUseCase,
+    GetDislikedUseCase,
+    RemoveDislikedUseCase,
+    {
+      provide: DISLIKED_REPOSITORY,
+      useClass: DislikedRepositoryImpl,
     },
     AdminGuard,
 

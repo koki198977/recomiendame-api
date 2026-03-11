@@ -13,6 +13,7 @@ import { Tmdb } from 'src/domain/entities/tmdb';
 import { RecommendationResponse } from 'src/domain/entities/recommendation.response';
 import { RecommendationPromptBuilder } from 'src/helpers/recommendation-prompt.builder';
 import { RecommendationScorer } from 'src/helpers/recommendation-scorer';
+import { DISLIKED_REPOSITORY, DislikedRepository } from '../ports/disliked.repository';
 
 @Injectable()
 export class GenerateRecommendationsUseCase {
@@ -29,6 +30,8 @@ export class GenerateRecommendationsUseCase {
     private readonly activityLogRepo: ActivityLogRepository,
     @Inject(TMDB_REPOSITORY)
     private readonly tmdbRepository: TmdbRepository,
+    @Inject(DISLIKED_REPOSITORY)
+    private readonly dislikedRepo: DislikedRepository,
   ) {}
 
   async execute(
@@ -44,7 +47,8 @@ export class GenerateRecommendationsUseCase {
       recentRecs,
       allRecs,
       user,
-      wishlist
+      wishlist,
+      dislikedIds
     ] = await Promise.all([
       this.userDataRepo.getSeenItems(userId),
       this.userDataRepo.getFavorites(userId),
@@ -53,11 +57,14 @@ export class GenerateRecommendationsUseCase {
       this.recommendationRepo.findAllByUser(userId),
       this.userRepo.findById(userId),
       this.userDataRepo.getWishlist(userId),
+      this.dislikedRepo.getAllDislikedIds(userId),
     ]);
 
     if (!user) {
       throw new Error('User not found');
     }
+
+    console.log(`🚫 User has ${dislikedIds.length} disliked items that will be excluded from recommendations`);
 
     // 2) Build intelligent prompt
     const prompt = new RecommendationPromptBuilder()
@@ -96,14 +103,17 @@ export class GenerateRecommendationsUseCase {
     // The prompt already tells OpenAI what to avoid
     const allPrevIds = new Set<number>(); // Empty set = no exclusions
     
-    console.log(`📋 No exclusions - showing all recommendations from AI`);
+    // Add disliked items to exclusion set
+    const excludeIds = new Set<number>(dislikedIds);
+    
+    console.log(`📋 Excluding ${excludeIds.size} disliked items from recommendations`);
     
     let candidates = await this.searchAndScoreCandidates(
       aiTitles,
       user,
       favorites,
       ratings,
-      allPrevIds,
+      excludeIds,
       feedback // Pasar el feedback para filtrar
     );
 
@@ -129,7 +139,7 @@ export class GenerateRecommendationsUseCase {
           user,
           favorites,
           ratings,
-          allPrevIds,
+          excludeIds,
           feedback
         );
         
@@ -162,7 +172,7 @@ export class GenerateRecommendationsUseCase {
           user,
           favorites,
           ratings,
-          allPrevIds,
+          excludeIds,
           feedback
         );
         
@@ -183,7 +193,7 @@ export class GenerateRecommendationsUseCase {
         const directSearchResults = await this.tmdbService.search(keyword);
         const newTitles = directSearchResults
           .slice(0, 5)
-          .filter(item => !allPrevIds.has(item.id))
+          .filter(item => !excludeIds.has(item.id))
           .map(r => r.title);
         directTitles.push(...newTitles);
         console.log(`🔍 Found ${newTitles.length} new results for keyword "${keyword}"`);
@@ -197,7 +207,7 @@ export class GenerateRecommendationsUseCase {
           user,
           favorites,
           ratings,
-          allPrevIds,
+          excludeIds,
           feedback
         );
         candidates.push(...directCandidates);
@@ -228,7 +238,7 @@ export class GenerateRecommendationsUseCase {
           const genreResults = await this.tmdbService.search(term);
           const genreTitles = genreResults
             .slice(0, 5)
-            .filter(item => !allPrevIds.has(item.id))
+            .filter(item => !excludeIds.has(item.id))
             .map(r => r.title);
           
           if (genreTitles.length > 0) {
@@ -237,7 +247,7 @@ export class GenerateRecommendationsUseCase {
               user,
               favorites,
               ratings,
-              allPrevIds,
+              excludeIds,
               feedback
             );
             candidates.push(...genreCandidates);
@@ -259,7 +269,7 @@ export class GenerateRecommendationsUseCase {
         user,
         favorites,
         ratings,
-        allPrevIds
+        excludeIds
       );
       candidates.push(...trendingCandidates);
       console.log(`✅ Total candidates after trending: ${candidates.length}`);
@@ -301,7 +311,7 @@ export class GenerateRecommendationsUseCase {
         user,
         favorites,
         ratings,
-        new Set() // No exclusions
+        excludeIds
       );
       uniqueCandidates.push(...emergencyTrending);
       console.log(`✅ Total candidates after emergency trending: ${uniqueCandidates.length}`);
@@ -337,7 +347,7 @@ export class GenerateRecommendationsUseCase {
     const results = await this.saveRecommendations(
       bestRecs,
       userId,
-      allPrevIds
+      excludeIds
     );
 
     return this.mapToResponse(results);
