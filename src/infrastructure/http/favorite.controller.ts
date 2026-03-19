@@ -17,7 +17,6 @@ import { AddFavoriteDto } from '../dtos/add-favorite.dto';
 import { GetFavoritesQuery } from '../dtos/get-favorites.query';
 
 @Controller('favorites')
-@UseGuards(JwtAuthGuard)
 export class FavoriteController {
   constructor(
     private readonly addFavorite: AddFavoriteUseCase,
@@ -25,7 +24,17 @@ export class FavoriteController {
     private readonly getFavorites: GetFavoritesUseCase,
   ) {}
 
+  @Get('shared/:userId')
+  async listSharedFavoritesHandler(
+    @Param('userId') userId: string,
+    @Query() query: GetFavoritesQuery,
+  ) {
+    const favorites = await this.getFavorites.execute(userId, query);
+    return { favorites };
+  }
+
   @Post()
+  @UseGuards(JwtAuthGuard)
   async addFavoriteHandler(
     @CurrentUser() user: { sub: string },
     @Body() body: AddFavoriteDto,
@@ -39,6 +48,7 @@ export class FavoriteController {
   }
 
   @Delete(':tmdbId')
+  @UseGuards(JwtAuthGuard)
   async removeFavoriteHandler(
     @CurrentUser() user: { sub: string },
     @Param('tmdbId') tmdbId: string,
@@ -48,6 +58,7 @@ export class FavoriteController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   async listFavoritesHandler(
     @CurrentUser() user: { sub: string },
     @Query() query: GetFavoritesQuery,
