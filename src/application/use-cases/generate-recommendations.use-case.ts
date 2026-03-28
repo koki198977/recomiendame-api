@@ -15,6 +15,7 @@ import { RecommendationPromptBuilder } from 'src/helpers/recommendation-prompt.b
 import { RecommendationScorer } from 'src/helpers/recommendation-scorer';
 import { DISLIKED_REPOSITORY, DislikedRepository } from '../ports/disliked.repository';
 import { ProfileSynthesisService } from 'src/infrastructure/ai/profile-synthesis.service';
+import { EmbeddingsService } from 'src/infrastructure/ai/embeddings.service';
 
 @Injectable()
 export class GenerateRecommendationsUseCase {
@@ -22,6 +23,7 @@ export class GenerateRecommendationsUseCase {
     private readonly openAi: OpenAiService,
     private readonly tmdbService: TmdbService,
     private readonly profileSynthesis: ProfileSynthesisService,
+    private readonly embeddingsService: EmbeddingsService,
     @Inject(USER_DATA_REPOSITORY)
     private readonly userDataRepo: UserDataRepository,
     @Inject(USER_REPOSITORY)
@@ -277,7 +279,41 @@ export class GenerateRecommendationsUseCase {
       }
     }
 
-    // 5) If not enough, add trending items
+    // 5) Vector KNN: buscar en DB contenidos similares al perfil del usuario (solo sin feedback)
+    if (!feedback) {
+      try {
+        const profileVector = await this.embeddingsService.getUserProfileVector(userId);
+        if (profileVector) {
+          const similar = await this.embeddingsService.findSimilarContent(
+            profileVector,
+            Array.from(excludeIds),
+            20,
+          );
+          if (similar.length > 0) {
+            console.log(`🧬 Vector KNN encontró ${similar.length} candidatos similares`);
+            const knnTitles = similar.map((s) => s.title);
+            const knnCandidates = await this.searchAndScoreCandidates(
+              knnTitles,
+              user,
+              favorites,
+              ratings,
+              excludeIds,
+            );
+            // Boost score de candidatos vectoriales para que compitan bien
+            knnCandidates.forEach((c) => {
+              c.score += 10;
+              c.reasons.unshift('🧬 Similitud vectorial');
+            });
+            candidates.push(...knnCandidates);
+            console.log(`✅ Añadidos ${knnCandidates.length} candidatos vectoriales`);
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ Vector search failed, continuing without it:', error.message);
+      }
+    }
+
+    // 6) If not enough, add trending items
     if (candidates.length < 15) {
       console.log(`⚠️ Only ${candidates.length} candidates, adding trending...`);
       const trendingCandidates = await this.addTrendingCandidates(
