@@ -165,6 +165,71 @@ export class ProfileSynthesisService {
     return user.aiProfile;
   }
 
+  /**
+   * Actualiza el perfil incorporando señales de feedback implícito
+   * (recomendaciones ignoradas y tráilers vistos sin guardar).
+   */
+  async synthesizeUserProfileWithImplicitFeedback(
+    userId: string,
+    ignoredTitles: string[],
+    trailerOnlyTitles: string[],
+  ): Promise<void> {
+    const rows = await this.prisma.$queryRaw<Array<{ aiProfile: string | null }>>`
+      SELECT "aiProfile" FROM "User" WHERE id = ${userId} LIMIT 1
+    `;
+    const previousProfile = rows[0]?.aiProfile ?? null;
+
+    const lines: string[] = [
+      'Actualiza el perfil de gustos del usuario incorporando estas nuevas señales de comportamiento.',
+      '',
+    ];
+
+    if (previousProfile) {
+      lines.push(`PERFIL ACTUAL:\n"${previousProfile}"`);
+      lines.push('');
+    }
+
+    if (ignoredTitles.length > 0) {
+      lines.push(`❌ IGNORÓ COMPLETAMENTE estas recomendaciones (no las vio, no las guardó):`);
+      lines.push(ignoredTitles.join(', '));
+      lines.push('→ Penaliza ligeramente el tipo de contenido que representan.');
+      lines.push('');
+    }
+
+    if (trailerOnlyTitles.length > 0) {
+      lines.push(`👀 Vio el tráiler pero NO guardó ni vio:`);
+      lines.push(trailerOnlyTitles.join(', '));
+      lines.push('→ El estilo visual le llama la atención pero algo lo frenó. Nota este patrón.');
+      lines.push('');
+    }
+
+    lines.push('Responde SOLO con el perfil actualizado en texto. Máximo 3 oraciones.');
+
+    const response = await this.openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Eres un psicólogo del entretenimiento. Actualiza perfiles de gustos con señales de comportamiento implícito.',
+        },
+        { role: 'user', content: lines.join('\n') },
+      ],
+      temperature: 0.3,
+      max_tokens: 300,
+    });
+
+    const newProfile = response.choices[0].message.content?.trim() ?? '';
+
+    await this.prisma.$executeRaw`
+      UPDATE "User"
+      SET "aiProfile" = ${newProfile},
+          "aiProfileUpdatedAt" = NOW()
+      WHERE id = ${userId}
+    `;
+
+    this.logger.log(`🧠 Perfil actualizado con feedback implícito para ${userId}`);
+  }
+
   // ─── helpers privados ────────────────────────────────────────────────────────
 
   private buildSynthesisPrompt(data: {

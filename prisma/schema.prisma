@@ -36,6 +36,7 @@ model User {
   wishListItems          WishListItem[]
   DeleteAccountToken     DeleteAccountToken[]
   dislikedItems          DislikedItem[]
+  trailerViews           TrailerView[]
 }
 
 model EmailVerificationToken {
@@ -79,6 +80,7 @@ model Tmdb {
   activityLogs    ActivityLog[]
   wishListItems   WishListItem[]
   dislikedItems   DislikedItem[]
+  trailerViews    TrailerView[]
 }
 
 model SeenItem {
@@ -171,6 +173,19 @@ model DislikedItem {
   tmdbId    Int
   mediaType String
   createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tmdb Tmdb @relation(fields: [tmdbId], references: [id])
+
+  @@unique([userId, tmdbId])
+}
+
+model TrailerView {
+  id          String   @id @default(cuid())
+  userId      String
+  tmdbId      Int
+  watchedSecs Int      @default(0) // segundos que vio el tráiler
+  createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tmdb Tmdb @relation(fields: [tmdbId], references: [id])

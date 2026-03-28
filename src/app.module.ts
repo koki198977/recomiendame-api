@@ -40,6 +40,7 @@ import { RatingRepositoryImpl } from './infrastructure/repositories/rating.repos
 import { OpenAiService } from './infrastructure/ai/openai.service';
 import { EmbeddingsService } from './infrastructure/ai/embeddings.service';
 import { ProfileSynthesisService } from './infrastructure/ai/profile-synthesis.service';
+import { ImplicitFeedbackService } from './infrastructure/ai/implicit-feedback.service';
 import { GenerateRecommendationsUseCase } from './application/use-cases/generate-recommendations.use-case';
 import { RecommendationController } from './infrastructure/http/recommendation.controller';
 import { USER_DATA_REPOSITORY } from './application/ports/user-data.repository';
@@ -94,6 +95,7 @@ import { DislikedRepositoryImpl } from './infrastructure/persistence/disliked.re
     OpenAiService,
     EmbeddingsService,
     ProfileSynthesisService,
+    ImplicitFeedbackService,
     GenerateRecommendationsUseCase,
     GetRecommendationsUseCase,
     GetRecommendationHistoryUseCase,
