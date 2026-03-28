@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './infrastructure/auth/auth.module';
@@ -37,6 +38,8 @@ import { GetUserRatingsUseCase } from './application/use-cases/get-user-ratings.
 import { RATING_REPOSITORY } from './application/ports/rating.repository';
 import { RatingRepositoryImpl } from './infrastructure/repositories/rating.repository.impl';
 import { OpenAiService } from './infrastructure/ai/openai.service';
+import { EmbeddingsService } from './infrastructure/ai/embeddings.service';
+import { ProfileSynthesisService } from './infrastructure/ai/profile-synthesis.service';
 import { GenerateRecommendationsUseCase } from './application/use-cases/generate-recommendations.use-case';
 import { RecommendationController } from './infrastructure/http/recommendation.controller';
 import { USER_DATA_REPOSITORY } from './application/ports/user-data.repository';
@@ -75,6 +78,7 @@ import { DislikedRepositoryImpl } from './infrastructure/persistence/disliked.re
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     AuthModule,
     PrismaModule,
     JwtModule.register({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '7d' } }),
@@ -88,6 +92,8 @@ import { DislikedRepositoryImpl } from './infrastructure/persistence/disliked.re
   ],
   providers: [
     OpenAiService,
+    EmbeddingsService,
+    ProfileSynthesisService,
     GenerateRecommendationsUseCase,
     GetRecommendationsUseCase,
     GetRecommendationHistoryUseCase,

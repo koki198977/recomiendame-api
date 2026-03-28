@@ -14,12 +14,14 @@ import { RecommendationResponse } from 'src/domain/entities/recommendation.respo
 import { RecommendationPromptBuilder } from 'src/helpers/recommendation-prompt.builder';
 import { RecommendationScorer } from 'src/helpers/recommendation-scorer';
 import { DISLIKED_REPOSITORY, DislikedRepository } from '../ports/disliked.repository';
+import { ProfileSynthesisService } from 'src/infrastructure/ai/profile-synthesis.service';
 
 @Injectable()
 export class GenerateRecommendationsUseCase {
   constructor(
     private readonly openAi: OpenAiService,
     private readonly tmdbService: TmdbService,
+    private readonly profileSynthesis: ProfileSynthesisService,
     @Inject(USER_DATA_REPOSITORY)
     private readonly userDataRepo: UserDataRepository,
     @Inject(USER_REPOSITORY)
@@ -66,7 +68,16 @@ export class GenerateRecommendationsUseCase {
 
     console.log(`🚫 User has ${dislikedIds.length} disliked items that will be excluded from recommendations`);
 
-    // 2) Build intelligent prompt
+    // 2) Load AI profile (memory) - non-blocking, fallback to null if fails
+    let aiProfile: string | null = null;
+    try {
+      aiProfile = await this.profileSynthesis.getOrGenerateProfile(userId);
+      if (aiProfile) console.log(`🧠 AI profile loaded (${aiProfile.length} chars)`);
+    } catch {
+      console.log('⚠️ Could not load AI profile, using raw history');
+    }
+
+    // 3) Build intelligent prompt
     const prompt = new RecommendationPromptBuilder()
       .withUser(user)
       .withSeenItems(seenItems)
@@ -75,9 +86,10 @@ export class GenerateRecommendationsUseCase {
       .withRecentRecommendations(recentRecs)
       .withWishlist(wishlist)
       .withFeedback(feedback || '')
+      .withAiProfile(aiProfile || '')
       .build();
     console.log("prompt: "+prompt)
-    // 3) Generate recommendations from AI (with retry if too many duplicates)
+    // 4) Generate recommendations from AI (with retry if too many duplicates)
     console.log('🤖 Generating recommendations with prompt...');
     let raw = await this.openAi.generate(prompt);
     console.log('📝 OpenAI raw response:', raw);

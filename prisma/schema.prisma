@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 model User {
@@ -21,6 +23,8 @@ model User {
   emailVerified  Boolean   @default(false)
   admin          Boolean   @default(false)
   createdAt      DateTime  @default(now())
+  aiProfile      String?   // Perfil de gustos sintetizado por IA (Nivel 2 RAG)
+  aiProfileUpdatedAt DateTime? // Última vez que se actualizó el perfil
 
   seenItems              SeenItem[]
   ratings                Rating[]
@@ -66,6 +70,7 @@ model Tmdb {
   trailerUrl  String?
   platforms   Json? // Ej: ['Netflix', 'Disney+', 'HBO Max']
   createdAt   DateTime  @default(now())
+  embedding   Unsupported("vector(1536)")? // ADN vectorial del contenido (text-embedding-3-small)
 
   seenItems       SeenItem[]
   ratings         Rating[]

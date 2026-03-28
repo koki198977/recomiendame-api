@@ -20,6 +20,7 @@ export class RecommendationPromptBuilder {
   private wishlist: Array<{ tmdbId: number; tmdb?: { title?: string } }> = [];
   private user?: User;
   private feedback?: string;
+  private aiProfile?: string;
 
   withSeenItems(items: SeenItem[]): this {
     this.seenItems = items;
@@ -53,6 +54,11 @@ export class RecommendationPromptBuilder {
 
   withFeedback(feedback: string): this {
     this.feedback = feedback;
+    return this;
+  }
+
+  withAiProfile(profile: string): this {
+    this.aiProfile = profile;
     return this;
   }
 
@@ -125,6 +131,14 @@ export class RecommendationPromptBuilder {
       const preferences = this.analyzePreferences();
       sections.push('## PERFIL DEL USUARIO');
       sections.push(this.buildPreferencesSection(preferences));
+
+      // Si hay perfil IA sintetizado, usarlo como memoria principal
+      if (this.aiProfile) {
+        sections.push('\n## MEMORIA DE GUSTOS (síntesis IA)');
+        sections.push(`"${this.aiProfile}"`);
+        sections.push('\nEste perfil resume el aprendizaje acumulado sobre el usuario. Úsalo como guía principal.');
+      }
+
       sections.push('\n## HISTORIAL DEL USUARIO');
       sections.push(this.buildHistorySection());
       

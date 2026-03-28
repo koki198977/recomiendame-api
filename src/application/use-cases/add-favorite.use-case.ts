@@ -12,6 +12,7 @@ import { ActivityLog } from 'src/domain/entities/activity-log';
 import { TmdbService } from 'src/infrastructure/tmdb/tmdb.service';
 import { TMDB_REPOSITORY, TmdbRepository } from '../ports/tmdb.repository';
 import { Tmdb } from 'src/domain/entities/tmdb';
+import { EmbeddingsService } from 'src/infrastructure/ai/embeddings.service';
 
 @Injectable()
 export class AddFavoriteUseCase {
@@ -26,6 +27,8 @@ export class AddFavoriteUseCase {
 
     @Inject(TMDB_REPOSITORY)
     private readonly tmdbRepo: TmdbRepository,
+
+    private readonly embeddingsService: EmbeddingsService,
   ) {}
 
   async execute(
@@ -73,6 +76,9 @@ export class AddFavoriteUseCase {
         new Date(),
       )
     );
+
+    // Generar embedding en background (no bloquea la respuesta)
+    this.embeddingsService.generateAndSaveEmbedding(tmdbId).catch(() => {});
 
     return favorite;
   }

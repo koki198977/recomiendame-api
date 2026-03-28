@@ -7,6 +7,7 @@ import { GetRecommendationsUseCase } from 'src/application/use-cases/get-recomme
 import { RecommendationResponse } from 'src/domain/entities/recommendation.response';
 import { GetRecommendationHistoryUseCase } from 'src/application/use-cases/get-recommendation-history.use-case';
 import { ListQueryDto } from '../dtos/list-query.dto';
+import { ProfileSynthesisService } from '../ai/profile-synthesis.service';
 
 @Controller('recommendations')
 @UseGuards(JwtAuthGuard)
@@ -15,6 +16,7 @@ export class RecommendationController {
     private readonly generateRecs: GenerateRecommendationsUseCase,
     private readonly getRecs: GetRecommendationsUseCase,
     private readonly getHistory: GetRecommendationHistoryUseCase,
+    private readonly profileSynthesis: ProfileSynthesisService,
   ) {}
 
   @Post()
@@ -44,5 +46,24 @@ export class RecommendationController {
     @Query() query: ListQueryDto,
   ) {
     return this.getHistory.execute(req.user.sub, query);
+  }
+
+  /**
+   * Fuerza la síntesis del perfil IA del usuario autenticado.
+   * Útil para probar el Nivel 2 sin esperar el CronJob semanal.
+   */
+  @Post('synthesize-profile')
+  async synthesizeProfile(@Request() req): Promise<{ profile: string }> {
+    const profile = await this.profileSynthesis.synthesizeUserProfile(req.user.sub);
+    return { profile };
+  }
+
+  /**
+   * Devuelve el perfil IA actual del usuario autenticado.
+   */
+  @Get('profile')
+  async getProfile(@Request() req): Promise<{ profile: string | null }> {
+    const profile = await this.profileSynthesis.getOrGenerateProfile(req.user.sub);
+    return { profile };
   }
 }
