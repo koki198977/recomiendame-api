@@ -93,18 +93,22 @@ export class GenerateRecommendationsUseCase {
     
     if (allAreDuplicates && aiTitles.length > 0) {
       console.log('⚠️ All AI titles are duplicates, regenerating with more creativity...');
-      const retryPrompt = prompt + '\n\nIMPORTANTE: Los títulos anteriores ya fueron recomendados. Genera 8 títulos COMPLETAMENTE DIFERENTES.';
+      const retryPrompt = prompt + '\n\nIMPORTANTE: Los títulos anteriores ya fueron recomendados. Genera 15 títulos COMPLETAMENTE DIFERENTES y NINGUNO puede estar en tus listas anteriores.';
       raw = await this.openAi.generate(retryPrompt);
       aiTitles = this.parseRecommendations(raw);
       console.log('🔄 Retry titles:', aiTitles);
     }
 
-    // 4) Don't exclude anything - just show what OpenAI recommends
-    // The prompt already tells OpenAI what to avoid
-    const allPrevIds = new Set<number>(); // Empty set = no exclusions
+    // 4) Explicitly exclude all known items to guarantee they are never recommended
+    const allPrevIds = new Set<number>([
+      ...seenItems.map(s => s.tmdbId),
+      ...favorites.map(f => f.tmdbId),
+      ...wishlist.map(w => w.tmdbId),
+      ...dislikedIds
+    ]);
     
-    // Add disliked items to exclusion set
-    const excludeIds = new Set<number>(dislikedIds);
+    // Add disliked items and others to exclusion set
+    const excludeIds = allPrevIds;
     
     console.log(`📋 Excluding ${excludeIds.size} disliked items from recommendations`);
     
@@ -128,7 +132,7 @@ export class GenerateRecommendationsUseCase {
       if (hasYear || hasMediaType) {
         console.log(`⚠️ Solo ${candidates.length} candidatos válidos con criterios específicos. Regenerando...`);
         
-        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN CRÍTICA: Los títulos anteriores NO cumplieron con los criterios específicos del usuario.\n\nRECUERDA:\n- Si pidió un AÑO específico, SOLO títulos de ese año exacto\n- Si pidió SERIES, SOLO series (no películas)\n- Si pidió PELÍCULAS, SOLO películas (no series)\n\nGenera 8 títulos COMPLETAMENTE DIFERENTES que SÍ cumplan EXACTAMENTE con los criterios.`;
+        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN CRÍTICA: Los títulos anteriores NO cumplieron con los criterios específicos del usuario.\n\nRECUERDA:\n- Si pidió un AÑO específico, SOLO títulos de ese año exacto\n- Si pidió SERIES, SOLO series (no películas)\n- Si pidió PELÍCULAS, SOLO películas (no series)\n\nGenera 15 títulos COMPLETAMENTE DIFERENTES que SÍ cumplan EXACTAMENTE con los criterios y que no estén repetidos en el historial.`;
         
         const retryRaw = await this.openAi.generate(retryPrompt);
         const retryTitles = this.parseRecommendations(retryRaw);
@@ -161,7 +165,7 @@ export class GenerateRecommendationsUseCase {
       if (duplicateCount >= 3) {
         console.log(`⚠️ ${duplicateCount} of ${aiTitles.length} AI titles were duplicates. Regenerating with stricter instructions...`);
         
-        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN: Los siguientes títulos YA fueron recomendados, NO los repitas: ${aiTitles.join(', ')}\n\nGenera 8 títulos COMPLETAMENTE DIFERENTES que cumplan con la solicitud.`;
+        const retryPrompt = prompt + `\n\n🚨 ATENCIÓN: Los siguientes títulos YA fueron recomendados, NO los repitas: ${aiTitles.join(', ')}\n\nGenera 15 títulos COMPLETAMENTE DIFERENTES que cumplan con la solicitud y sean totalmente nuevos para el usuario.`;
         
         const retryRaw = await this.openAi.generate(retryPrompt);
         const retryTitles = this.parseRecommendations(retryRaw);
@@ -254,18 +258,18 @@ export class GenerateRecommendationsUseCase {
             console.log(`✅ Added ${genreCandidates.length} candidates from genre search "${term}"`);
           }
           
-          if (candidates.length >= 8) break;
+          if (candidates.length >= 15) break;
         }
         
-        if (candidates.length >= 8) break;
+        if (candidates.length >= 15) break;
       }
     }
 
     // 5) If not enough, add trending items
-    if (candidates.length < 8) {
+    if (candidates.length < 15) {
       console.log(`⚠️ Only ${candidates.length} candidates, adding trending...`);
       const trendingCandidates = await this.addTrendingCandidates(
-        8 - candidates.length,
+        15 - candidates.length,
         user,
         favorites,
         ratings,
@@ -294,7 +298,7 @@ export class GenerateRecommendationsUseCase {
         user,
         favorites,
         ratings,
-        8 - uniqueCandidates.length
+        15 - uniqueCandidates.length
       );
       
       if (matchingOldRecs.length > 0) {
@@ -307,7 +311,7 @@ export class GenerateRecommendationsUseCase {
     if (uniqueCandidates.length < 3 && !feedback) {
       console.log(`⚠️ CRITICAL: Only ${uniqueCandidates.length} candidates, using trending...`);
       const emergencyTrending = await this.addTrendingCandidates(
-        8 - uniqueCandidates.length,
+        15 - uniqueCandidates.length,
         user,
         favorites,
         ratings,
@@ -318,7 +322,7 @@ export class GenerateRecommendationsUseCase {
     }
 
     // 9) Select best with diversity
-    const bestRecs = RecommendationScorer.diversify(uniqueCandidates, 8);
+    const bestRecs = RecommendationScorer.diversify(uniqueCandidates, 15);
 
     // 10) Ensure we have at least some recommendations
     if (bestRecs.length === 0) {

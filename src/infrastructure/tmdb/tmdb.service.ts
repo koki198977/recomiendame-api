@@ -127,9 +127,13 @@ export class TmdbService {
     const url = `${this.baseUrl}/${type}/${id}/videos`;
 
     try {
-      // Get all videos without language filter to have more options
+      // Pedimos explícitamente que incluya videos en español y en inglés como respaldo
       const { data } = await this.http.axiosRef.get(url, {
-        params: { api_key: this.apiKey },
+        params: { 
+          api_key: this.apiKey,
+          language: 'es-ES',
+          include_video_language: 'es,es-ES,es-MX,en,null'
+        },
       });
 
       if (!data.results || data.results.length === 0) {

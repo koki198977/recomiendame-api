@@ -138,6 +138,8 @@ export class RecommendationPromptBuilder {
 
     // Restricciones mínimas
     sections.push('\n## RESTRICCIONES');
+    sections.push('CRÍTICO: NO repitas NINGUNO de los títulos listados en el Historial, Favoritos o Wishlist. Los títulos que recomiendes deben ser 100% nuevos para el usuario.');
+    sections.push('Sé proactivo e inteligente: Asegúrate de incluir 3 a 5 "joyas ocultas" (obras muy aclamadas por la crítica o de nicho) que coincidan perfectamente con el perfil, no te limites a lo popular.');
     
     // Excluir wishlist (ya los conoce) - solo si no hay feedback específico
     if (!this.feedback) {
@@ -154,7 +156,7 @@ export class RecommendationPromptBuilder {
 
     // Formato de respuesta
     sections.push('## FORMATO DE RESPUESTA');
-    sections.push('Responde con EXACTAMENTE 8 títulos, uno por línea, sin números ni descripciones.');
+    sections.push('Responde con EXACTAMENTE 15 títulos, uno por línea, sin números ni descripciones.');
     sections.push('Solo nombres de películas/series, nada más.');
     sections.push('');
     sections.push('Ejemplo:');
@@ -166,6 +168,13 @@ export class RecommendationPromptBuilder {
     sections.push('The Dark Knight');
     sections.push('Game of Thrones');
     sections.push('Pulp Fiction');
+    sections.push('Fight Club');
+    sections.push('Interstellar');
+    sections.push('Mr. Robot');
+    sections.push('Succession');
+    sections.push('True Detective');
+    sections.push('The Sopranos');
+    sections.push('Fargo');
 
     return sections.join('\n');
   }
