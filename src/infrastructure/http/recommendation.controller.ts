@@ -8,6 +8,7 @@ import { RecommendationResponse } from 'src/domain/entities/recommendation.respo
 import { GetRecommendationHistoryUseCase } from 'src/application/use-cases/get-recommendation-history.use-case';
 import { ListQueryDto } from '../dtos/list-query.dto';
 import { ProfileSynthesisService } from '../ai/profile-synthesis.service';
+import { EmbeddingsService } from '../ai/embeddings.service';
 
 @Controller('recommendations')
 @UseGuards(JwtAuthGuard)
@@ -17,6 +18,7 @@ export class RecommendationController {
     private readonly getRecs: GetRecommendationsUseCase,
     private readonly getHistory: GetRecommendationHistoryUseCase,
     private readonly profileSynthesis: ProfileSynthesisService,
+    private readonly embeddingsService: EmbeddingsService,
   ) {}
 
   @Post()
@@ -65,5 +67,15 @@ export class RecommendationController {
   async getProfile(@Request() req): Promise<{ profile: string | null }> {
     const profile = await this.profileSynthesis.getOrGenerateProfile(req.user.sub);
     return { profile };
+  }
+
+  /**
+   * Dispara el backfill de embeddings manualmente (admin).
+   * Genera embeddings para todos los Tmdb que aún no tienen.
+   */
+  @Post('backfill-embeddings')
+  async backfillEmbeddings(): Promise<{ ok: boolean }> {
+    this.embeddingsService.backfillMissingEmbeddings().catch(() => {});
+    return { ok: true };
   }
 }
