@@ -567,44 +567,35 @@ Si ninguno coincide bien, responde con "NINGUNO".
       ? 'tv' 
       : undefined;
 
-    console.log(`🔍 Searching and scoring ${titles.length} titles...`);
+    console.log(`🔍 Searching and scoring ${titles.length} titles in parallel...`);
 
-    for (const title of titles) {
+    const results = await this.parallelMap(titles, async (title) => {
       try {
         console.log(`  Searching: "${title}"`);
-        const results = await this.tmdbService.search(title);
-        
-        if (results.length === 0) {
+        const searchResults = await this.tmdbService.search(title);
+
+        if (searchResults.length === 0) {
           console.log(`  ❌ No results found for: "${title}"`);
-          continue;
+          return null;
         }
 
-        const first = results[0];
+        const first = searchResults[0];
         const itemYear = first.releaseDate ? new Date(first.releaseDate).getFullYear() : null;
         console.log(`  ✅ Found: ${first.title} (ID: ${first.id}, Type: ${first.mediaType}, Year: ${itemYear || 'unknown'})`);
-        
-        // Filtrar por año si es requerido
-        if (requiredYear && itemYear) {
-          if (itemYear !== requiredYear) {
-            console.log(`  ⏭️  Skipping (wrong year: ${itemYear}, required: ${requiredYear})`);
-            continue;
-          }
-        }
-        
-        // Filtrar por tipo de media si es requerido
-        if (requiredMediaType && first.mediaType !== requiredMediaType) {
-          console.log(`  ⏭️  Skipping (wrong type: ${first.mediaType}, required: ${requiredMediaType})`);
-          continue;
-        }
-        
-        if (excludeIds.has(first.id)) {
-          console.log(`  ⏭️  Skipping (already recommended): ${first.title}`);
-          continue;
+
+        if (requiredYear && itemYear && itemYear !== requiredYear) {
+          console.log(`  ⏭️  Skipping (wrong year: ${itemYear}, required: ${requiredYear})`);
+          return null;
         }
 
-        if (seenIds.has(first.id)) {
-          console.log(`  ⏭️  Skipping (duplicate in this batch): ${first.title}`);
-          continue;
+        if (requiredMediaType && first.mediaType !== requiredMediaType) {
+          console.log(`  ⏭️  Skipping (wrong type: ${first.mediaType}, required: ${requiredMediaType})`);
+          return null;
+        }
+
+        if (excludeIds.has(first.id)) {
+          console.log(`  ⏭️  Skipping (already recommended): ${first.title}`);
+          return null;
         }
 
         const scored = RecommendationScorer.score(first, {
@@ -616,10 +607,18 @@ Si ninguno coincide bien, responde con "NINGUNO".
         });
 
         console.log(`  📊 Score: ${scored.score} - ${scored.reasons.join(', ')}`);
-        candidates.push(scored);
-        seenIds.add(first.id); // Mark as seen
+        return scored;
       } catch (error) {
         console.error(`  ❌ Error searching "${title}":`, error.message);
+        return null;
+      }
+    });
+
+    // Deduplicate by tmdbId (parallel calls may return same item)
+    for (const scored of results) {
+      if (scored && !seenIds.has(scored.item.id)) {
+        candidates.push(scored);
+        seenIds.add(scored.item.id);
       }
     }
 
@@ -644,29 +643,17 @@ Si ninguno coincide bien, responde con "NINGUNO".
 
     console.log(`📺 Got ${trending.length} trending items from TMDB`);
 
-    for (const trendingItem of trending) {
-      if (candidates.length >= count) break; // Stop when we have enough
+    const eligibleTrending = trending.filter(t => !excludeIds.has(t.id));
 
+    const scoredResults = await this.parallelMap(eligibleTrending, async (trendingItem) => {
       console.log(`  Checking trending: ${trendingItem.title} (ID: ${trendingItem.id})`);
-      
-      if (excludeIds.has(trendingItem.id)) {
-        console.log(`  ⏭️  Already recommended`);
-        continue;
-      }
-
-      // Search to get full details
       try {
         const results = await this.tmdbService.search(trendingItem.title);
         const item = results[0];
-        
-        if (!item) {
-          console.log(`  ❌ Not found in search`);
-          continue;
-        }
-        
-        if (excludeIds.has(item.id)) {
-          console.log(`  ⏭️  Already recommended (after search)`);
-          continue;
+
+        if (!item || excludeIds.has(item.id)) {
+          console.log(`  ⏭️  Skipping: ${trendingItem.title}`);
+          return null;
         }
 
         const scored = RecommendationScorer.score(item, {
@@ -677,10 +664,15 @@ Si ninguno coincide bien, responde con "NINGUNO".
         });
 
         console.log(`  ✅ Added with score: ${scored.score}`);
-        candidates.push(scored);
+        return scored;
       } catch (error) {
         console.error(`  ❌ Error processing trending item:`, error.message);
+        return null;
       }
+    });
+
+    for (const scored of scoredResults) {
+      if (scored) candidates.push(scored);
     }
 
     console.log(`✅ Found ${candidates.length} trending candidates`);
@@ -839,6 +831,23 @@ Si ninguno coincide bien, responde con "NINGUNO".
     }
     
     return [...new Set(keywords)].slice(0, 3); // Max 3 keywords
+  }
+
+  /**
+   * Runs async tasks in parallel with a concurrency limit to avoid overwhelming external APIs.
+   */
+  private async parallelMap<T, R>(
+    items: T[],
+    fn: (item: T) => Promise<R>,
+    concurrency = 5,
+  ): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += concurrency) {
+      const batch = items.slice(i, i + concurrency);
+      const batchResults = await Promise.all(batch.map(fn));
+      results.push(...batchResults);
+    }
+    return results;
   }
 
   private parseRecommendations(raw: string | string[]): string[] {
