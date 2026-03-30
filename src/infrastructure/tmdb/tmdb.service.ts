@@ -127,12 +127,11 @@ export class TmdbService {
     const url = `${this.baseUrl}/${type}/${id}/videos`;
 
     try {
-      // Pedimos explícitamente que incluya videos en español y en inglés como respaldo
       const { data } = await this.http.axiosRef.get(url, {
         params: { 
           api_key: this.apiKey,
-          language: 'es-ES',
-          include_video_language: 'es,es-ES,es-MX,en,null'
+          language: 'es-MX',
+          include_video_language: 'es-MX,es-419,es,es-ES,en,null'
         },
       });
 
@@ -142,24 +141,31 @@ export class TmdbService {
 
       const videos = data.results.filter((v) => v.site === 'YouTube');
 
-      // Priority 1: Spanish (any variant - includes Latino)
+      // Priority 1: Latin American Spanish (es-MX or es-419)
       let trailer = videos.find(
-        (v) => v.type === 'Trailer' && v.iso_639_1 === 'es'
+        (v) => v.type === 'Trailer' && (v.iso_3166_1 === 'MX' || v.iso_639_1 === 'es' && v.iso_3166_1 !== 'ES')
       );
 
-      // Priority 2: English (for subtitles)
+      // Priority 2: Any Spanish trailer
+      if (!trailer) {
+        trailer = videos.find(
+          (v) => v.type === 'Trailer' && v.iso_639_1 === 'es'
+        );
+      }
+
+      // Priority 3: English trailer
       if (!trailer) {
         trailer = videos.find(
           (v) => v.type === 'Trailer' && v.iso_639_1 === 'en'
         );
       }
 
-      // Priority 3: Any trailer
+      // Priority 4: Any trailer
       if (!trailer) {
         trailer = videos.find((v) => v.type === 'Trailer');
       }
 
-      // Priority 4: Any video
+      // Priority 5: Any video
       if (!trailer && videos.length > 0) {
         trailer = videos[0];
       }
