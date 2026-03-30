@@ -321,7 +321,8 @@ export class GenerateRecommendationsUseCase {
         user,
         favorites,
         ratings,
-        excludeIds
+        excludeIds,
+        feedback,
       );
       candidates.push(...trendingCandidates);
       console.log(`✅ Total candidates after trending: ${candidates.length}`);
@@ -363,7 +364,8 @@ export class GenerateRecommendationsUseCase {
         user,
         favorites,
         ratings,
-        excludeIds
+        excludeIds,
+        feedback,
       );
       uniqueCandidates.push(...emergencyTrending);
       console.log(`✅ Total candidates after emergency trending: ${uniqueCandidates.length}`);
@@ -515,11 +517,16 @@ Si ninguno coincide bien, responde con "NINGUNO".
       const lower = feedback.toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Remove accents
       
-      // Detectar año específico (2020-2029)
+      // Detectar año específico (2020-2029) o frases relativas como "este año", "este año"
+      const currentYear = new Date().getFullYear();
       const yearMatch = lower.match(/\b(202[0-9]|201[0-9])\b/);
+      const isCurrentYear = /\beste\s+a[nñ]o\b|\bdel\s+a[nñ]o\b|\bde\s+este\s+a[nñ]o\b|\brecientes?\b|\brecien\b/.test(lower);
       if (yearMatch) {
         requiredYear = parseInt(yearMatch[1]);
         console.log(`🎯 Filtering by year: ${requiredYear}`);
+      } else if (isCurrentYear) {
+        requiredYear = currentYear;
+        console.log(`🎯 Filtering by current year: ${requiredYear}`);
       }
       
       // Detectar tipo de contenido - MEJORADO con más variaciones
@@ -631,15 +638,26 @@ Si ninguno coincide bien, responde con "NINGUNO".
     user: any,
     favorites: any[],
     ratings: any[],
-    excludeIds: Set<number>
+    excludeIds: Set<number>,
+    feedback?: string,
   ) {
     console.log(`🔥 Fetching trending items (need ${count})...`);
-    const trending = await this.tmdbService.getTrending(count * 3); // Fetch more to account for duplicates
+    const trending = await this.tmdbService.getTrending(count * 3);
     const candidates: any[] = [];
 
     const avgRating = ratings.length > 0
       ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
       : 3.5;
+
+    // Detect required media type from feedback
+    let requiredMediaType: 'movie' | 'tv' | null = null;
+    if (feedback) {
+      const lower = feedback.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const hasSeries = [/\bseries?\b/, /\bserie\b/, /\bshows?\b/, /\bshow\b/, /\btv\b/, /\bteleserie/, /\bminiserie/].some(p => p.test(lower));
+      const hasMovies = [/\bpeliculas?\b/, /\bpelicula\b/, /\bpelis?\b/, /\bpeli\b/, /\bfilms?\b/, /\bfilm\b/, /\bmovies?\b/, /\bmovie\b/, /\bcine\b/].some(p => p.test(lower));
+      if (hasSeries && !hasMovies) requiredMediaType = 'tv';
+      else if (hasMovies && !hasSeries) requiredMediaType = 'movie';
+    }
 
     console.log(`📺 Got ${trending.length} trending items from TMDB`);
 
@@ -653,6 +671,11 @@ Si ninguno coincide bien, responde con "NINGUNO".
 
         if (!item || excludeIds.has(item.id)) {
           console.log(`  ⏭️  Skipping: ${trendingItem.title}`);
+          return null;
+        }
+
+        if (requiredMediaType && item.mediaType !== requiredMediaType) {
+          console.log(`  ⏭️  Skipping trending (wrong type: ${item.mediaType}, required: ${requiredMediaType}): ${item.title}`);
           return null;
         }
 

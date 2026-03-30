@@ -77,11 +77,15 @@ export class RecommendationPromptBuilder {
       const lower = this.feedback.toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Remove accents
       
-      // Detectar año específico
+      // Detectar año específico o frases relativas como "este año"
+      const currentYear = new Date().getFullYear();
       const yearMatch = lower.match(/\b(202[0-9]|201[0-9])\b/);
-      if (yearMatch) {
-        sections.push(`⚠️ AÑO ESPECÍFICO: Solo títulos del año ${yearMatch[1]}`);
-        sections.push(`NO incluyas títulos de otros años (ni ${parseInt(yearMatch[1]) - 1}, ni ${parseInt(yearMatch[1]) + 1})`);
+      const isCurrentYear = /\beste\s+a[nñ]o\b|\bdel\s+a[nñ]o\b|\bde\s+este\s+a[nñ]o\b|\brecientes?\b|\brecien\b/.test(lower);
+      const detectedYear = yearMatch ? parseInt(yearMatch[1]) : isCurrentYear ? currentYear : null;
+
+      if (detectedYear) {
+        sections.push(`⚠️ AÑO ESPECÍFICO: Solo títulos del año ${detectedYear}`);
+        sections.push(`NO incluyas títulos de otros años (ni ${detectedYear - 1}, ni ${detectedYear + 1})`);
         sections.push('');
       }
       
