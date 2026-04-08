@@ -20,7 +20,6 @@ import { GetWishListUseCase } from 'src/application/use-cases/get-wishlist.use-c
 
 
 @Controller('wishlist')
-@UseGuards(JwtAuthGuard)
 export class WishListController {
   constructor(
     private readonly addWishList: AddToWishListUseCase,
@@ -28,7 +27,17 @@ export class WishListController {
     private readonly getWishList: GetWishListUseCase,
   ) {}
 
+  @Get('shared/:userId')
+  async listSharedWishListHandler(
+    @Param('userId') userId: string,
+    @Query() query: GetWishListQuery,
+  ) {
+    const items = await this.getWishList.execute(userId, query);
+    return { wishlist: items };
+  }
+
   @Post()
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async addWishListHandler(
     @CurrentUser() user: { sub: string },
@@ -39,6 +48,7 @@ export class WishListController {
   }
 
   @Delete(':tmdbId')
+  @UseGuards(JwtAuthGuard)
   async removeWishListHandler(
     @CurrentUser() user: { sub: string },
     @Param('tmdbId') tmdbId: string,
@@ -48,6 +58,7 @@ export class WishListController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   async listWishListHandler(
     @CurrentUser() user: { sub: string },
     @Query() query: GetWishListQuery,
