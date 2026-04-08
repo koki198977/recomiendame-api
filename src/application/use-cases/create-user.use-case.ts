@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 import { ConfigService } from '@nestjs/config';
@@ -8,16 +8,25 @@ import {
   EMAIL_TOKEN_REPOSITORY,
   EmailVerificationTokenRepository,
 } from '../ports/email-token.repository';
+import { TMDB_REPOSITORY, TmdbRepository } from '../ports/tmdb.repository';
+import { FAVORITE_REPOSITORY, FavoriteRepository } from '../ports/favorite.repository';
 import { SendWelcomeEmailUseCase } from './send-welcome-email.use-case';
 import { User } from '../../domain/entities/user';
+import { Tmdb } from '../../domain/entities/tmdb';
 
 @Injectable()
 export class CreateUserUseCase {
+  private readonly logger = new Logger(CreateUserUseCase.name);
+
   constructor(
     @Inject(USER_REPOSITORY)
     private readonly userRepo: UserRepository,
     @Inject(EMAIL_TOKEN_REPOSITORY)
     private readonly tokenRepo: EmailVerificationTokenRepository,
+    @Inject(TMDB_REPOSITORY)
+    private readonly tmdbRepo: TmdbRepository,
+    @Inject(FAVORITE_REPOSITORY)
+    private readonly favoriteRepo: FavoriteRepository,
     private readonly config: ConfigService,
     private readonly sendWelcomeEmail: SendWelcomeEmailUseCase,
   ) {}
@@ -32,6 +41,7 @@ export class CreateUserUseCase {
     language?: string;
     favoriteGenres?: string[];
     favoriteMedia?: string;
+    picks?: Array<{ tmdbId: number; title: string; mediaType: 'movie' | 'tv' }>;
   }): Promise<User> {
     // 1. Validar existencia
     const existing = await this.userRepo.findByEmail(input.email);
@@ -73,6 +83,31 @@ export class CreateUserUseCase {
       user.fullName,
       token,
     );
+
+    // 6. Persistir picks como favoritos (secuencial, errores no interrumpen el registro)
+    for (const pick of (input.picks ?? [])) {
+      try {
+        const tmdb = new Tmdb(
+          pick.tmdbId,
+          pick.title,
+          new Date(),
+          undefined,
+          undefined,
+          undefined,
+          [],
+          undefined,
+          undefined,
+          pick.mediaType,
+          [],
+          undefined,
+        );
+        await this.tmdbRepo.save(tmdb);
+        await this.favoriteRepo.addFavorite(user.id, pick.tmdbId);
+      } catch (err) {
+        // log and continue — picks errors must not interrupt registration
+        this.logger.warn(`Pick ${pick.tmdbId} skipped: ${err?.message}`);
+      }
+    }
 
     return user;
   }

@@ -6,7 +6,23 @@ import {
   IsString,
   IsDateString,
   IsArray,
+  IsInt,
+  IsIn,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class PickDto {
+  @IsInt()
+  tmdbId: number;
+
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsIn(['movie', 'tv'])
+  mediaType: 'movie' | 'tv';
+}
 
 export class CreateUserDto {
   @IsEmail()
@@ -38,4 +54,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   favoriteMedia?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PickDto)
+  picks?: PickDto[];
 }
